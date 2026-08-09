@@ -9,6 +9,12 @@ measured through M4.5b), and **TinyVillage**'s laws (the Deadline Law, tokenized
 the label factory, rungs ship only by beating their null). This document is the introduction
 of the three to each other.
 
+> **QC STATUS (2026-08-09, same day):** a five-auditor Opus swarm pass (Intercom room
+> `fusion-qc`) logged **146 findings, 39 blockers** — see `docs/qc/QC_CONSOLIDATED.md` and
+> the five lane reports. Consensus corrections are applied in-place below (D-011…D-017);
+> the remaining blockers are design work mandated for **v0.2** (`KICKOFF_SPEC_V02.md`).
+> **M0 is suspended until v0.2 exists — do not build against this revision.**
+
 > **One breath:** a tokamak simulation with real (tiered, honest) physics, flown at kHz by a
 > trained neural controller that must actually hold the plasma or it disrupts — watched,
 > remembered, and **voiced** by a resident LLM triple on the warpbus, with **full-duplex
@@ -22,9 +28,12 @@ of the three to each other.
 
 The claim is **not** a predictive fusion code. Tier-0/1 physics below use the real published
 formulas on toy geometry; tier-2 is eye-candy-grade MHD (real equations, coarse grid). The
-claim **is**: (a) a control problem hard enough that a neural network is *necessary* (an
-elongated plasma is vertically unstable on ~ms timescales — a controller that takes turns
-melts the vessel), (b) an architecture in which a fast non-linguistic cerebellum and a
+claim **is**: (a) a control problem hard enough that continuous kHz-class feedback is
+*mandatory* (an elongated plasma is vertically unstable — growth times are **wall-set,
+~10–100 ms class with a passive conducting structure, not κ-set**; QC corrected v0.1's
+1–5 ms here — and without feedback it is lost; whether a *neural* controller beats a
+well-tuned classical one is not asserted — it is exactly what F-NULL-C measures), (b) an
+architecture in which a fast non-linguistic cerebellum and a
 resident linguistic cortex share one machine honestly, and (c) a demonstration that "own the
 loop" produces a machine that can **sense, remember, and speak** about its own life with
 receipts. The DeepMind/EPFL TCV result (Degrave et al., *Nature* 2022 — deep-RL driving 19
@@ -71,7 +80,9 @@ BOTH SEAMS:             THE DEADLINE LAW — the world never dilates for a model
 - **Tier 1 — the shape (2-D, control-grade).** Free-boundary **Grad-Shafranov** equilibrium
   solver (FreeGS-style Picard iteration, ported to CUDA; grid 65×65 → 129×129), PF coil
   circuit equations (L-R dynamics, ~8–12 coils v1), **vertical position instability**
-  (growth time γ⁻¹ ~ 1–5 ms at κ ≈ 1.7 — the controller's true opponent), 1-D radial
+  (γ⁻¹ **wall-set, 10–100 ms class — which requires modeling the passive conducting
+  structure** (a vessel L-R circuit; without it the mode is ideal-fast and uncontrollable;
+  QC corrected v0.1's "1–5 ms at κ≈1.7" — the controller's true opponent), 1-D radial
   transport (n(ρ), T(ρ), 20–40 radial nodes, prescribed diffusivities + sawtooth crash
   model). This is the tier the controller flies against — the same shape real machines'
   control systems use. **Multi-rate law (QC fix):** the full GS equilibrium re-solves at
@@ -117,14 +128,24 @@ Each scenario = seed + config TOML; goldens in `goldens/`.
   currents/temps. The observer problem is part of the problem.
 - **Actions:** PF coil voltages (8–12), gas puff rate, pellet trigger, NBI/ECRH power,
   (v2: current drive). Rate-limited, saturating, lagged — like real actuators.
-- **Policy:** MLP/GRU, 2–4 × 256–512 hidden, fp16/int8, **< 50 µs inference** inside the
-  10 kHz control tick — hand-rolled CUDA GEMM or ggml; weights mmap'd from a flat file
-  (`trainer/export_weights.py`, the booster pattern). No Python in the product loop.
-- **Training = solver-then-distill (LODESTAR doctrine, verbatim):** CEM/MPPI offline
-  oracle (reusing the booster's `guidance_mppi_cuda.cu` skeleton) proves each scenario
-  solvable and generates near-optimal teachers → distill → PPO polish on **batched CUDA
-  envs (2048–4096 parallel reactors, env state never leaves VRAM)**. Teacher quality is
-  everything; never distill a weak controller.
+- **Policy:** MLP (Degrave et al. ran a 3-hidden-layer MLP at 10 kHz on TCV), 2–4 ×
+  256–512 hidden, **on CPU at fixed precision** (D-012: a fp16/int8 CUDA policy feeding
+  the integrator breaks the memcmp oracle, and the parent's proven path is a ~10 µs C
+  net on CPU — which also removes a CUDA consumer from the 100 µs tick). **< 50 µs
+  inference as a CPU budget**; weights mmap'd from a flat file
+  (`trainer/export_weights.py`). No Python in the product loop.
+- **Training = oracle-guided, with the parent's measured null respected (QC correction):**
+  the booster's own LODESTAR record is titled *"the honest wall"* — end-to-end
+  distillation of the compound case plateaued at 0/16 (null D-041); what shipped green
+  was a **θ-predictor over an analytic base law**. So: CEM/MPPI offline oracle proves
+  each scenario solvable (unchanged — that part is the parent's proven half) → the M2
+  session **decides the student's architecture against that record** (θ-style structured
+  policy vs direct distill vs pure sim-RL à la TCV/MPO — Degrave et al. used *no*
+  distillation) with a pre-registered losing branch. PPO/MPO polish on **batched CUDA
+  envs (2048–4096 parallel reactors)** — the training envs are the **fourth consumer of
+  the one-dynamics-source law** (D-011), and planner/teacher rollouts must decorrelate
+  their disturbance streams from the plant's Philox counters (the clairvoyance trap)
+  while ghosts deliberately share them (that sharing *is* F-GHOST).
 - **The innovation source (named organ — QC fix):** a lightweight **EKF / one-step learned
   forward model runs beside the policy at all times** as the standing prediction the
   tokenizer's innovation is computed against (a distilled policy has no native state
@@ -177,7 +198,9 @@ error where no filter exists — the free-tail razor applied to the cerebellum).
 [tick +30s nominal Q=8.1]                       silence, priced: the world as anticipated
 ```
 
-**Budget law:** nominal hour ≤ ~100 tokens; crisis second ≤ ~40 tokens. Adaptive
+**Budget law (single source of truth: `contracts/events.toml [budget]` — QC fixed the
+three-way contradiction here):** nominal hour ≤ 150 tokens (5-min ticks ≈ 96/hr + slack);
+crisis second ≤ 40 tokens, with storms collapsing to summary events. Adaptive
 10³–10⁴ : 1 down-conversion, done *by the plant's own surprise* — no scheduler, no polling
 summarizer. Thresholds live in one table (`contracts/events.toml`), pre-registered.
 
@@ -189,16 +212,23 @@ writ envelope greenwald max=0.85            writ priority divertor>Q horizon=60s
 ```
 Typed revs on the `writ` lane. A deterministic translator compiles them to reference
 schedules **through hard floors the mind cannot cross** (the governor: q95 ≥ 2.2, Greenwald
-f ≤ 1.0, coil current/temp limits, ramp-rate limits). A writ past a floor is **refused, and
+f ≤ 0.95 — `contracts/floors.toml` is the single source of truth; QC caught the 1.0 here —
+coil current/temp limits, ramp-rate limits). A writ past a floor is **refused, and
 the refusal is a receipt** on the tape. The LLM steers like an executive; it can never grab
 the stick. Harm dial: H0 log-only (shadow) → H1 auto-apply within envelopes → H2 apply
 after cancelable delay → H3 operator-confirm. **v1 ships at H0/H1.**
 
 ### 4.3 The Deadline Law at the seam
 
-The triple is a **guest organ**: judgment budget **p95 ≤ 2 s** at boundary grain; the 100 µs
-world never waits. A late judgment is dropped and `[sys] drop llm ...` enters the trunk —
-the mind can later say "I was slow during the ELM burst," and mean it, with a receipt.
+The triple is a **guest organ** with a **fixed budget, not a percentile** (QC: TinyVillage
+L2 demands a fixed tick budget declared at design time plus an abort — a p95 has neither;
+and no estate receipt reports a p95 anyway, only means 327/349 ms and maxima 2.1/5.5 s):
+**judgment budget = 2 s hard; at 2 s the branch is aborted**, the judgment is dropped, and
+`[sys] drop llm ...` enters the trunk — the mind can later say "I was slow during the ELM
+burst," and mean it, with a receipt. Every writ carries the **tick its evidence was formed
+at** (`formed_tick`) and the governor refuses writs whose staleness exceeds the writ
+class's window — TinyVillage L2's `effective_tick` half, restored (D-015). The 100 µs
+world never waits.
 
 ---
 
@@ -218,10 +248,13 @@ the mind can later say "I was slow during the ELM burst," and mean it, with a re
   the **fine-tune path** (`huggingface.co/blog/nvidia/fine-tuning-nemotron-35-asr`) lets us
   domain-tune the vocabulary — *Greenwald, q95, ELM, divertor, gyrotron, beta_N* — the same
   Unsloth-era muscle the estate already has, pointed at ASR.
-- **ASR, fallback (zero-risk, already vendored & proven on this box):** sherpa-onnx
-  streaming zipformer + Parakeet-TDT-0.6B truth-lane re-decode (the demesne stack,
-  running today). The ASR seam is an interface (`asr.h` — auricle's existing contract);
-  either backend drops in.
+- **ASR unification (QC finding V-04 — the risk was overstated):** sherpa-onnx **already
+  supports Nemotron 3.5 streaming** (upstream PRs #3044/#3671, pre-exported ONNX, ~3.8×
+  real-time on CPU int8) — so "primary" and "fallback" are the **same backend**: the
+  proven, already-vendored auricle sherpa stack, version-bumped and sha256 re-pinned.
+  M4's ASR task is a pin bump, not an export project; running ASR **on CPU** (auricle's
+  recorded rule) also removes a CUDA consumer and ~1 GB of VRAM. The zipformer +
+  Parakeet-TDT truth lane remains the in-tree alternative behind the same `asr.h` seam.
 - **Two-plane discipline (verbatim from SYNCYTIUM):** partials → reflex plane only
   (perception; revocable; the Sentinel may act on a *forming* command); finals → trunk
   commits on lane `opv`. Endpoint ~0.35 s. A backspaced word never poisons the trunk.
@@ -241,11 +274,23 @@ the mind can later say "I was slow during the ELM burst," and mean it, with a re
   speaker grille).
 - **Etiquette (M4.5's measured lesson):** per-seat emission rate caps + the interruption
   budget; dial-zero over-fire (593/hr measured on text) is *unlivable* out loud — the
-  voice loop splits by standing (QC fix): **solicited speech** — answers to the operator's
+  voice loop splits by standing (QC fix): the measured dial-zero over-fire is **921
+  emits/hr on the only full-day run** (auricle run C, molt v1; v0.1's 593/hr was run A,
+  which covered only ~55–62% of the day — QC-MEMBRANE caught the denominator); **solicited
+  speech** — answers to the operator's
   questions and commands — is reactive, safe, and **ships at M4**; **unsolicited
   initiative** — interjections, warnings, reach-outs — stays shadow (H0, brief-only) until
   **F-INSTINCT** passes. A reactor that answers when asked is a tool; one that interrupts
   well is the bet, and the bet waits for its gate.
+
+### 5.2b Acoustic law (QC blocker V-B1 + MEM, independently — the mic hears the TTS)
+
+**Headset required in v1** (auricle's recorded precedent: deterministic me/them attribution
+beats AEC complexity; AEC is a v2 node, not a v1 gate). Without it, VAD-triggered barge-in
+self-pauses the reactor on its own first word, and worse: the reactor's own speech
+transcribes onto lane `opv` and enters the trunk *as the operator*. Additionally, the TTS
+output is lane-stamped and its transcript **never enters `opv`** regardless of acoustics —
+self-echo suppression at the lane, not the microphone (D-014).
 
 ### 5.3 Duplex rules
 
@@ -264,8 +309,17 @@ before-commit; mid-sentence is the typical case** — the ghost can only fire on
 command's parameter has landed in the partial, which usually leaves trailing words and
 always leaves the endpoint (QC fix: the guarantee is stated at the commit boundary, not
 the sentence). The warning is not an opinion; it is a receipt from the same physics,
-pre-verified (the Verifier Law's instant horizon). If the operator proceeds anyway (H-dial permitting), the
-fork-vs-reality memcmp is itself a falsifier run (§8 F-GHOST).
+pre-verified (the Verifier Law's instant horizon).
+
+**Commit, defined once for the whole repo (D-013 — three QC lanes converged on it):** a
+command **commits when the governor accepts it, tick-stamped** — not when ASR finalizes,
+not when the operator stops talking. And because the warning pipeline (probe ~65–70 ms +
+generation ~1–2 s + TTS start) cannot beat an ASR-final at H1 speeds (QC blocker V-B3),
+**numeric setpoint writs from voice run at H2: governor-accept opens a spine-side objection
+window (default 3 s, config) with a readback**, during which the Sentinel's ghost — or the
+operator's "belay" — cancels cleanly. The before-commit guarantee is thereby *engineered*
+rather than raced. If the operator proceeds anyway (H-dial permitting), the fork-vs-reality
+memcmp is itself a falsifier run (§8 F-GHOST).
 
 ---
 
@@ -295,9 +349,9 @@ holds the plasma, still prints its Monte-Carlo rates.**
 | Nemotron 3.5 ASR 0.6B (fp16/int8 ONNX) | 0.7–1.2 GB (or CPU fallback: 0) | 160 ms chunks; partial ≤ 300 ms |
 | TTS (Piper) | ≤ 0.3 GB (CPU-capable) | first audio ≤ 300 ms; barge-in pause ≤ 150 ms |
 | plant tier 0/1 + policy net + MPPI buffers | ≤ 0.3 GB | dt 100 µs; policy ≤ 50 µs; RT factor ≥ 1.0 |
-| tier-2 MHD fields (128³ × ~8 × fp16) | 0.25–0.5 GB | 10–30 Hz field updates |
+| tier-2 MHD **solver working set** (fields are 32 MiB at 128³×8×fp16; the budget is state copies + fluxes + staging — QC re-derived) | 0.25–0.5 GB | 10–30 Hz field updates |
 | renderer (separate process, WDDM) + desktop | **measured up to ~4.6 GB on this box** (auricle receipts) — lean-desktop play mode prescribed; budget 2–4.6 GB | 60 fps |
-| **total** | **≈ 10.5–14 GB** (QC fix: worst-case desktop is the honest number) | fits; lean desktop for play mode; ASR-on-CPU fallback recovers ~1 GB |
+| **total** | **9.9–14.5 GB by the rows; worst case ~16.2 GB does NOT fit** (QC re-summed) | **the shipping config is prescribed, ≈ 11.4 GB:** ASR on CPU (D-004/V-04), policy on CPU (D-012), lean desktop — that is the configuration every §7 claim binds to |
 
 **Training mode is headless and LLM-free** (no contention): batched envs + PPO own the GPU.
 The ghost budget: fork + 500 ms lookahead ≤ 25 ms wall (tier 0/1 at ≥ 20× RT). All numbers
@@ -393,7 +447,9 @@ proven sherpa fallback behind one seam; H100 throughput figures are vendor-repor
 irrelevant at N=1 anyway (we need latency, which must be measured here). Membrane: the 9B
 judgment ceiling, the over-fire/etiquette gap, and stance confusion are inherited *measured*
 problems — the voice loop stays in shadow until the emit QLoRA passes F-INSTINCT, because a
-reactor that talks 593 times an hour is a fire alarm, not a colleague. And the whole spec is
+reactor that talks ~900 times an hour (921/hr, the full-day measured rate — D-015) is a
+fire alarm, not a colleague. F-INSTINCT's held-out eval set for THIS domain does not exist
+yet and no milestone creates it (QC blocker) — v0.2 must assign it a home. And the whole spec is
 pre-build: every number in §7 is a target until a receipt in `runs/` says otherwise.
 
 ---

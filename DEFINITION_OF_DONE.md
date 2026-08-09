@@ -8,6 +8,9 @@ A milestone is DONE when **all** of the following hold — partial credit does n
    milestone's goldens; goldens updated and committed in `goldens/`.
 3. **The null is reported** — whatever organ shipped beat (or honestly lost to) its
    baseline, published either way in the receipt. No organ ships without its null run.
+   **If the null wins, the milestone is still DONE** when the loss is receipted and the
+   null is *adopted as the shipping organ* (the booster's own precedent: a measured null
+   is a result, not a failure — QC finding P-26 closed this deadlock).
 4. **Docs synced in the same commit as the work:** ROADMAP checkbox flipped,
    SESSION_LOG entry appended, DECISIONS.md entries added for anything that changed a
    pre-registered table or design call.

@@ -8,8 +8,11 @@ milestone in ROADMAP.md unless SESSION_LOG's tail says otherwise.
 
 ## Non-negotiables (inherited law; violations are regressions)
 
-1. **C/C++20 + CUDA only in the product.** Python confined to `trainer/` (the dev rig).
-   PowerShell only for dev scripts in `tools/`.
+1. **C/C++20 + CUDA only in the product core** (`core/ control/ membrane/ voice/
+   telemetry/`). Python confined to `trainer/` (the dev rig); PowerShell only for
+   `tools/`. The `ui/` observer client is web-stack (Tauri/three.js) **by design** — it is
+   a pure observer, deletable without touching the core (spec §6); that is the one
+   sanctioned exception (QC P-fix).
 2. **The booster constitution** (spec §2.2): state changes only through the integrator; no
    assist term — if the controller can't hold the plasma, it disrupts; ONE dynamics source
    (`__host__ __device__`) shared by plant, MPPI, and ghosts; deterministic (Philox, fixed
@@ -58,7 +61,10 @@ pre-registered — change = a D-entry.
 
 ## Glossary (mandatory terms — drift fails review)
 
-**fusor** (the core binary) · **spine/cerebellum/cortex/depths** (the four tiers) ·
+**fusor** (the core binary) · **the warpbus** (the estate's shared two-plane bus: an
+append-only committed-rev tape + an ephemeral reflex plane of forming partials — the
+medium every lane below rides; SYNCYTIUM's fabric, here) ·
+**spine/cerebellum/cortex/depths** (the four tiers) ·
 **innovation** (sensor minus cerebellum prediction; the upward gate) · **writ** (a typed
 downward reference; never an actuator) · **floor** (a governor limit the mind cannot cross) ·
 **ghost** (a forked-physics counterfactual, before-commit) · **drop-event** (a recorded

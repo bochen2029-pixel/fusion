@@ -1,0 +1,6 @@
+# QC catch (REPO): core.autocrlf with no .gitattributes exposes determinism evidence.
+# Sources normalize to LF in-repo; goldens and ledgers are byte-exact evidence — never touched.
+* text=auto
+goldens/** -text
+*.jsonl -text
+*.bin -text

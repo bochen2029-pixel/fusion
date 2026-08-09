@@ -4,12 +4,20 @@
 # named line. Nominal = ticks. Budget law: nominal hour <= ~100 tokens.
 
 [innovation]
-sigma_token = 3.0        # innovation >= 3 sigma -> one event token (cluster + magnitude)
+# QC fix (CTL-B3 + PHY, independently): per-channel per-sample thresholds fire ~1080
+# events/s at 3 sigma — 4-5 orders over budget. Innovation is therefore computed on the
+# WINDOWED CLUSTER RESIDUAL (aggregation_window_ms), one event max per cluster per window;
+# sustained storms collapse to one "storm" summary event + counter (the flood->rate-cap
+# immune row, inherited from fabric.h's self-attack lab).
+aggregation_window_ms = 250
+sigma_token = 3.0        # windowed cluster residual >= 3 sigma -> one event token
 sigma_alarm = 5.0        # >= 5 sigma -> priority event (band should dwell)
+storm_collapse_after = 4 # >4 events from one cluster in 10 s -> storm summary + counter
 clusters = ["vertical", "radial", "density", "current", "thermal"]
 
 [ticks]
-nominal_interval_s = 30  # "[tick +30s nominal Q=...]" — silence, priced
+nominal_interval_s = 300 # "[tick +300s nominal Q=...]" — QC fix: 30 s ticks alone were
+                         # 12-14x the stated budget; 5-min ticks ~ 96 tok/hr
 include_q = true
 
 [limits]                 # proximity events fire at frac_warn, again at frac_alarm
@@ -25,5 +33,8 @@ report_drop_events = true # the cerebellum's own deadline misses always tokenize
 drift_sigma = 1.0        # slow-organ drift threshold (per 5-minute window)
 
 [budget]
+# THE single source of truth for the budget law (spec §4.1 prose cites this table).
+# Nominal: ticks (~96/hr) + slack => the cap below. Crisis: enforced by the tokenizer;
+# overflow collapses to storm summaries, never dropped percepts (the gate rule).
+max_tokens_per_hr_nominal = 150
 max_tokens_per_s_crisis = 40
-max_tokens_per_min_nominal = 4

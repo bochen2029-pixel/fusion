@@ -5,6 +5,19 @@ The next phase to build is the **first unchecked milestone**. A milestone is DON
 reported, docs synced in the same commit. Spec: [FUSION_ARCHITECTURE_v0.1.md](FUSION_ARCHITECTURE_v0.1.md) §9.
 Decisions live in [DECISIONS.md](DECISIONS.md) (append-only).
 
+- [ ] **V0.2 — the QC-swarm revision (MANDATORY BEFORE M0; bootstrap: `KICKOFF_SPEC_V02.md`).**
+      Disposition all 39 blockers + 60 majors from the five-auditor pass
+      (`docs/qc/QC_CONSOLIDATED.md` + lane reports). Core design deliverables:
+      `contracts/machine.toml` (pin the machine; resolve the γ-vs-Q two-machine
+      contradiction) · the reward/cost function · the disruption/quench model + its event
+      token · the writ grammar v1 (id/supersedes/ttl/cancel/formed_tick) · the scenario
+      schema `_TEMPLATE.toml` + stochastic model (what is random, for Wilson CIs) ·
+      F-INSTINCT's eval-set home + F-PRESENCE-F grader protocol (TinyVillage L12) ·
+      the statecheck fence · GPU-arbitration policy + tick-jitter gate · crisis
+      scheduling (probe batching, molt deferral) · nulls for the two new organs
+      (tokenizer, ghost) · KICKOFF_M0 rewritten (TOML parser + third_party plan + build
+      block). **Exit:** spec bumped to `FUSION_ARCHITECTURE_v0.2.md` (v0.1 kept beside),
+      every blocker traceably dispositioned, REPO's cold-session simulation re-run clean.
 - [ ] **M0 — the burn.** Tier-0 0-D burn physics (Bosch-Hale, alpha heating, Bremsstrahlung
       + synchrotron, IPB98(y,2) τ_E, live Q) + PID null + `fusor_mc` headless Monte-Carlo
       (Wilson CIs) + memcmp replay oracle + minimal three.js dashboard (stretch).
