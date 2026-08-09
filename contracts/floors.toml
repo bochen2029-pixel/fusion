@@ -1,0 +1,20 @@
+# contracts/floors.toml — the governor (v0 placeholders; deterministic, spine-enforced)
+# The mind cannot cross these at any harm level. Changing a floor = a D-entry.
+# Values are scenario-scale placeholders until M1 pre-registers the real machine config.
+
+[plasma]
+q95_min = 2.2
+greenwald_max = 0.95     # governor margin below the physical limit (=1.0) on purpose
+beta_n_max_frac = 1.0    # of the configured Troyon-ish limit
+
+[rates]
+ip_ramp_max = "0.15MA/s"
+n_ramp_max = "0.05e20/s"
+
+[coils]
+current_max_frac = 0.95
+temp_max_frac = 0.90
+
+[spine_autonomy]
+# The spine fires these itself, mind present or not:
+emergency_shutdown_on = ["vde_detected", "quench_precursor", "coil_overtemp"]

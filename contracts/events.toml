@@ -1,0 +1,29 @@
+# contracts/events.toml — the tokenizer of machine experience (v0 placeholders)
+# Pre-registered: changing a threshold = a D-entry in DECISIONS.md.
+# The plant earns tokens only by surprising its cerebellum (innovation) or crossing a
+# named line. Nominal = ticks. Budget law: nominal hour <= ~100 tokens.
+
+[innovation]
+sigma_token = 3.0        # innovation >= 3 sigma -> one event token (cluster + magnitude)
+sigma_alarm = 5.0        # >= 5 sigma -> priority event (band should dwell)
+clusters = ["vertical", "radial", "density", "current", "thermal"]
+
+[ticks]
+nominal_interval_s = 30  # "[tick +30s nominal Q=...]" — silence, priced
+include_q = true
+
+[limits]                 # proximity events fire at frac_warn, again at frac_alarm
+greenwald  = { warn = 0.80, alarm = 0.92 }
+q95        = { warn = 2.6,  alarm = 2.35 }   # floor itself lives in floors.toml
+beta_n     = { warn = 0.85, alarm = 0.95 }   # fraction of the Troyon-ish limit
+
+[controller]
+saturation_min_s = 0.5   # coil saturated longer than this -> event
+report_drop_events = true # the cerebellum's own deadline misses always tokenize
+
+[health]
+drift_sigma = 1.0        # slow-organ drift threshold (per 5-minute window)
+
+[budget]
+max_tokens_per_s_crisis = 40
+max_tokens_per_min_nominal = 4

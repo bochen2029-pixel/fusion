@@ -1,0 +1,9 @@
+build/
+build_*/
+runs/
+dist/
+*.log
+*.user
+.vs/
+__pycache__/
+trainer/checkpoints/

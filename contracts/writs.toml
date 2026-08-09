@@ -1,0 +1,26 @@
+# contracts/writs.toml — the downward grammar (v0 placeholders)
+# The cortex writes REFERENCES, never actuators. Every writ passes floors.toml gates;
+# a refused writ is receipted. Harm dial: H0 log-only, H1 auto within envelope,
+# H2 delayed-cancelable, H3 operator-confirm. v1 ships H0/H1 only.
+
+[setpoint]
+params = ["Ip", "n_bar", "q_target", "P_aux"]
+fields = { value = "float", ramp = "float/s" }
+harm = "H1"
+
+[mode]
+values = ["RAMP", "FLAT_TOP", "BURN", "RECOVERY", "SOFT_SHUTDOWN"]
+harm = "H1"
+# EMERGENCY_SHUTDOWN is spine-owned (a gate, not a writ) — the mind may REQUEST it (H1);
+# the spine may also fire it on its own floors, mind or no mind.
+
+[envelope]
+fields = { param = "string", min = "float", max = "float" }
+harm = "H1"          # may only TIGHTEN within floors.toml; never loosen past a floor
+
+[priority]
+fields = { ordering = "string", horizon_s = "float" }
+harm = "H0"          # advisory to the scenario planner
+
+[refusal]
+receipt_required = true   # every gate refusal lands on the tape, always
