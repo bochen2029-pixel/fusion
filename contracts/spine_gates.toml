@@ -1,0 +1,41 @@
+# contracts/spine_gates.toml — the spine's autonomous safety gates (v0.2; CTL-09/CTL-10)
+# The one table where the spine WRITES rather than refuses. Every predicate is a
+# deterministic expression over NAMED plant signals with dwell (in 100 µs ticks) and
+# hysteresis. The spine fires these itself, mind present or not; every firing is a
+# tick-stamped [sys] receipt.
+#
+# ASSIST-TERM ACCOUNTING (CTL-10 — the sharpest finding of the swarm): a spine-triggered
+# shutdown is a FAILED outcome class ("SPINE_SHUTDOWN") in fusor_mc's verdict taxonomy
+# and in objective.toml [terminal]. It is reported as its own rate in every receipt and
+# is the third reported metric of F-NULL-C. A controller rescued by these gates has
+# failed; a policy that learns to induce them is farming an assist and the cost ordering
+# (disrupt 10000 > spine 6000 > 0) exists to make that a losing strategy, verified by the
+# seedcheck/gate-farming probe in fusor_mc.
+
+[vde_detected]
+predicate  = "abs(Z - Z_ref) > z_trip_m AND abs(dZ_dt) > zdot_trip_m_per_s"
+z_trip_m          = 0.12       # 60% of the ~0.20 m wall-contact excursion
+zdot_trip_m_per_s = 2.0
+dwell_ticks       = 20         # 2 ms
+response          = "hard_shutdown"   # kill heating, VS max-effort centering attempt,
+                                      # fast rampdown; the VDE usually completes anyway —
+                                      # the gate bounds energy, it cannot restore control
+false_positive_budget_per_1000 = 1.0  # measured in fusor_mc, receipted
+
+[quench_precursor]
+predicate  = "dIp_dt_MA_per_s < -3.0 OR (T_e drop > 0.5 in tau_ms 2.0) OR f_rad > 1.0"
+dwell_ticks = 50               # 5 ms
+response    = "soft_rampdown"  # heating off, controlled Ip ramp-down at floor rate
+false_positive_budget_per_1000 = 2.0
+
+[coil_overtemp]
+predicate  = "any(coil_temp_frac > 1.0)"   # 1.0 of floors.toml temp_max_frac x machine limit
+dwell_ticks = 1000             # 100 ms — thermal, slow
+response    = "soft_rampdown"
+false_positive_budget_per_1000 = 0.5
+
+[demo_interaction]  # the M5 toggle scene (FRESH_EYES minor): "controller OFF" disables
+# the CEREBELLUM only. Spine gates stay ARMED — the audience watches the VDE outrun a
+# max-effort spine response (honest: the gate bounds energy, it cannot re-stabilize an
+# uncontrolled vertical mode). Gates are never disabled in any mode; there is no demo flag.
+gates_always_armed = true

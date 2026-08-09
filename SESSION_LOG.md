@@ -2,7 +2,9 @@
 
 One entry per session, **appended at the end, never rewritten**. A fresh session reads the
 tail and knows exactly where the project stands. Format: date · session id/handle · what
-was done (with receipts/commits) · honest state · next.
+was done (with receipts/commits) · honest state · next. **Coding-session entries
+additionally carry: receipt paths, commit SHA, measured numbers, and the null result**
+(P-19 — this line is the template).
 
 ---
 
@@ -102,3 +104,43 @@ rigs exist.
 machine.toml first), produces v0.2 + `docs/qc/DISPOSITIONS.md` (dispositioning the five
 lanes AND FRESH_EYES), re-runs the cold-session simulation, rewrites KICKOFF_M0 — then
 M0, then the M0.5 thesis slice before M1.
+
+---
+
+## S3 · 2026-08-09 · the v0.2 revision (same session as S2, continued on operator's order; no product code)
+
+**Done — the whole KICKOFF_SPEC_V02 list, walked in order:**
+- **`FUSION_ARCHITECTURE_v0.2.md`** — the canon bump (v0.1 frozen beside): three tiers,
+  narrowed anti-turn claim (D-018), §2.4 disruption model, M2 ladder, EKF information
+  set, GS pipelined-by-construction, ghost mode declared + F-GHOST rescoped, nine-
+  falsifier registry (F-BURN-0/F-SHAPE-1/F-VERACITY new; F-PRESENCE-F three-arm),
+  §7 rebuilt (prescribed config only, GPU doctrine, CPU cores, tick budget, latency
+  chains), §11 "enforced by" column, §12 honest limits updated.
+- **Contracts:** `machine.toml` (FUSOR-1 — Q ≈ 2.3 @ H98=1 and γ⁻¹ ≈ 25–40 ms derived
+  from ONE config, arithmetic in-file) · `objective.toml` · `dispersions.toml` ·
+  `diagnostics.toml` · `spine_gates.toml` (SPINE_SHUTDOWN failure class) ·
+  `scenarios/_TEMPLATE.toml` (incl. lethal_legal class) · `events.toml` v1 (per-cluster
+  Mahalanobis, [terminal]/[organ]/[phase]/[cascade], health debounce, M3 vocab freeze) ·
+  `floors.toml` v1 (dir/units-in-keys/activates_at/margins everywhere + low-density
+  floor) · `writs.toml` v1 (grammar + autonomy dial A0–A3 + input-tape).
+- **`docs/qc/DISPOSITIONS.md`** — all 146 swarm findings + FRESH_EYES items dispositioned
+  line-by-line (2 open operator questions: tier-2 ruling, LICENSE).
+- **`KICKOFF_M0.md` rewritten** (branch step, tomlplusplus + third_party plan, exact
+  build block, goldens defined-and-created, F-BURN-0 exit) · **cold-session simulation
+  re-run: 13/13 CLEAN** (receipt `runs/v02-coldsim-2026-08-09.md`; v0.1's two hard stops
+  and two contradictions all cleared).
+- Supporting: DoD clauses 1/3/6 patched (P-13/P-17) · CLAUDE.md canon pointer + full
+  glossary (tokamak + estate halves) + branch/hot-path conventions · README → v0.2 ·
+  ROADMAP V0.2 box **checked** + standing current-kickoff pointer (P-15) · .gitignore
+  completed (P-14) · `tools/snapshot.ps1` (P-17) · SESSION_LOG format note (P-19).
+- **DECISIONS D-021…D-030** appended (machine pin; objective/dispersions/seed law; EKF;
+  offline-planner + pipelined GS; M2 ladder; ghost rescope; arbitration + budgets;
+  membrane mechanics; falsifier registry v2; spine gates + dial + grammar).
+
+**Honest state:** the spec is now buildable-cold by its own re-run simulation, every
+audit finding is traceably dispositioned, and the claim is falsifiable on paper — and
+still zero code, zero measurements: every §7 number remains a target until `runs/` says
+otherwise. Two questions await the operator: tier-2 MHD (D-020) and LICENSE.
+
+**Next:** a fresh session opens **`KICKOFF_M0.md`** (Step 0: branch `m0-burn`) and builds
+the burn. Then M0.5 — the thesis slice — before M1 (D-019).

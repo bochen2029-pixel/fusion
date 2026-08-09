@@ -1,0 +1,41 @@
+# contracts/diagnostics.toml — the synthetic sensor model (v0.2; CTL-25; D-023)
+# The policy and the EKF see ONLY these channels (statecheck fence, CTL-14b). The EKF's
+# R matrix is built from this file. "3-sigma" in events.toml means sigma AS DEFINED HERE.
+# Latency is in 100 µs ticks and eats directly into the vertical loop's delay budget.
+
+[magnetics]         # 40 probes: 24 poloidal-field b_theta + 16 flux loops
+n_bprobe      = 24
+n_fluxloop    = 16
+rate_khz      = 10.0
+sigma_frac    = 0.005      # per-sample, of full-scale
+bias_walk     = 0.001      # random-walk sigma per second, of full-scale — INTEGRATOR
+                           # DRIFT, the famous real problem (grows over the shot)
+latency_ticks = 2
+dropout_p     = 1e-6       # per-sample channel dropout (health events feed on this)
+quant_bits    = 14
+
+[interferometer]    # line-averaged density, 2 chords
+rate_khz      = 1.0
+sigma_e20     = 0.03
+latency_ticks = 10
+fringe_jump_p = 1e-7       # classic failure mode; a blind fault
+
+[d_alpha]
+rate_khz      = 10.0
+sigma_frac    = 0.02
+latency_ticks = 2
+
+[neutrons]          # fission-chamber rate → P_fus proxy
+rate_khz      = 1.0
+sigma_frac    = 0.03
+latency_ticks = 10
+
+[coil_sensors]      # currents + temps on all 12 circuits
+rate_khz      = 10.0
+sigma_frac    = 0.002
+latency_ticks = 1
+
+[ece]               # T_e proxy, 1 chord (burn control needs a temperature)
+rate_khz      = 1.0
+sigma_frac    = 0.03
+latency_ticks = 10

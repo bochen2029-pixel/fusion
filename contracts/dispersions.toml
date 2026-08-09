@@ -1,0 +1,41 @@
+# contracts/dispersions.toml — what is random (v0.2; CTL-12 + PHY-05; D-022)
+# "A landing rate is meaningless without the randomization it survives" (booster law).
+# This file IS the stochastic model behind every Wilson CI. Pre-registered BEFORE M0's
+# PID is tuned (after that it is retroactive). One seed → one Philox stream per
+# [stream] domain; per-seed replay stays bit-exact.
+#
+# OBSERVABLE dispersions: the controller could infer them from its sensors.
+# BLIND dispersions: injected off-nominal truths (the --inject pattern) — the policy
+# must survive them WITHOUT being told (CTL-21's hide-the-flags law).
+
+[streams]           # Philox counter-domain offsets (D-011: the clairvoyance trap)
+# plant       — the live run's disturbance stream
+# ghost       — SHARES plant's stream by design (that sharing IS F-GHOST)
+# teacher     — DECORRELATED (offset domain): the oracle may not know disturbance timing
+# train_env   — DECORRELATED per-env (fourth consumer, D-011)
+offsets = { plant = 0, ghost = 0, teacher = 1, train_env = 2 }
+
+[initial_jitter]    # observable; applied at scenario start (fractions, 1-sigma, gaussian)
+Ip_frac        = 0.02
+n_frac         = 0.05
+T_frac         = 0.05
+z0_mm          = 3.0      # initial vertical offset — every run starts perturbed
+
+[plant_scatter]     # blind; per-run plant-parameter truths (fractions, 1-sigma)
+H98            = 0.05     # confinement luck
+tau_wall_frac  = 0.05     # vessel time constant tolerance
+coil_R_frac    = 0.03     # circuit resistance tolerance
+actuator_lag_frac = 0.10  # per-actuator lag scatter around nominal
+
+[disturbance_timing]  # exogenous events draw timing/magnitude from these (PHY/CTL-05:
+# state-triggered events — sawtooth via q0 criterion, ELM via pedestal criterion — are
+# NOT randomized here; their timing emerges from state, so no stream can leak it)
+nbi_trip_time_s      = { dist = "uniform", lo = 5.0, hi = 25.0 }
+coil_fail_time_s     = { dist = "uniform", lo = 5.0, hi = 25.0 }
+impurity_puff_time_s = { dist = "uniform", lo = 5.0, hi = 25.0 }
+impurity_puff_mag    = { dist = "loguniform", lo = 0.002, hi = 0.02 }  # delta n_imp/n_e
+vde_kick_mm          = { dist = "uniform", lo = 5.0, hi = 30.0 }       # impulse in Z
+hl_backtransition_H98 = { dist = "uniform", lo = 0.70, hi = 0.85 }     # step drop target
+
+[sensor_noise]      # observable; per-channel sigmas live in diagnostics.toml — this
+seed_domain = "diagnostics"   # block only names the stream domain

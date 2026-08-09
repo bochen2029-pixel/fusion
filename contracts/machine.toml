@@ -1,0 +1,115 @@
+# contracts/machine.toml — FUSOR-1, the pinned machine (v0.2; D-021)
+# ---------------------------------------------------------------------------
+# FUSOR-1 is a SYNTHETIC compact high-field tokamak (SPARC-class geometry/field,
+# deliberately thick-walled). It is not any real device. Both load-bearing numbers —
+# Q>1 capability AND the wall-set vertical growth time — are DERIVED from this one
+# config below (PHY-01/PHY-02/FRESH_EYES-D1: never anchor on a named real machine;
+# no real machine is both Q>1-capable and fast-VDE).
+# Every floor, ramp rate, scenario number, and demo timing derives from this file.
+# Changing any value = a D-entry (pre-registered table).
+# ---------------------------------------------------------------------------
+
+[geometry]
+R0_m       = 1.85    # major radius
+a_m        = 0.57    # minor radius (aspect ratio A = 3.25, epsilon = 0.308)
+kappa_sep  = 1.85    # separatrix elongation (shaping / GS boundary target)
+kappa_area = 1.65    # AREA elongation kappa_a = S/(pi a^2) — THE kappa IPB98 uses
+                     # (PHY-09: the classic implementation bug is using kappa_sep here)
+delta      = 0.45    # triangularity
+volume_m3  = 19.6    # 2 pi^2 R a^2 kappa_a = 19.739*1.85*0.3249*1.65
+xsection_m2 = 1.68   # pi a^2 kappa_a (poloidal cross-section area S_p)
+
+[field_current]
+B0_T       = 12.0    # on-axis toroidal field (REBCO-class, synthetic)
+Ip_MA      = 8.5     # flat-top plasma current
+q95_design = 3.0     # scaling estimate at flat-top (q_cyl = 5 a^2 B / (R Ip) = 1.24,
+                     # shaping factor ~2.4 at kappa_sep 1.85 / delta 0.45); the GS solver
+                     # REPORTS the real q95 from M1 on — this number is a design target,
+                     # never an input to control.
+
+[operating_point]   # the reference flat-top point every §7/§8 number binds to
+n_bar_e20  = 3.0     # line-averaged electron density [1e20 m^-3]
+T_avg_keV  = 8.0     # volume-averaged temperature
+H98        = 1.0     # confinement multiplier (free parameter; H/L transitions move it)
+Zeff       = 1.8
+M_amu      = 2.5     # 50/50 D-T
+
+# --- Q>1 capability, derived (the M0 gate rests on this arithmetic) ----------------
+# IPB98(y,2): tau_E = 0.0562 * Ip^0.93 * B^0.15 * nbar19^0.41 * P^-0.69
+#                    * R^1.97 * kappa_a^0.78 * eps^0.58 * M^0.19   [s; P=P_loss in MW]
+#   pieces at FUSOR-1: 8.5^0.93=7.32 · 12^0.15=1.452 · 30^0.41=4.033 · 1.85^1.97=3.360
+#                      · 1.65^0.78=1.478 · 0.308^0.58=0.505 · 2.5^0.19=1.190
+#   => tau_E = 7.19 * P^-0.69 * H98
+# Stored energy at the reference point: W = 3 n T V = 3·3.0e20·(8 keV)·19.6 m^3 = 22.6 MJ
+# Self-consistent P_loss (P = W/tau_E(P)):  P^0.31 = 22.6/7.19  =>  P_loss = 40 MW
+# Fusion power (flat-profile floor, Bosch-Hale <sv>(8 keV) = 5.2e-23 m^3/s):
+#   P_fus = (n^2/4)<sv> E_fus V = 2.25e40·5.2e-23·2.82e-12 J·19.6 = 65 MW ; P_alpha = 13 MW
+# => P_aux = 40 - 13 = 27 MW ; Q = 65/27 ≈ 2.3 at H98 = 1.0 (profile peaking is headroom,
+#    not claimed). Q > 1 requires H98 ≳ 0.85 at this point — the gate is PASSABLE and
+#    NOT TRIVIAL, which is what F-BURN-0 wants. Every number above is restated by code
+#    at runtime and receipted; this comment is the pre-registered expectation.
+# β_N sanity: <p> = (2/3)W/V = 0.77 MPa → β = 1.34% → β_N = β·a·B/Ip = 1.08 (f_Troyon 0.39)
+# Greenwald: n_GW = Ip/(π a^2) = 8.33e20 → f_GW = 0.36 at reference. Margins everywhere.
+
+[limits]            # machine-level physical limits (floors.toml takes margins BELOW these)
+troyon_C           = 2.8    # beta_N max = C (no-wall, conservative l_i-flavored constant)
+greenwald_e20      = 8.33   # Ip/(pi a^2), empirical disruptive BOUNDARY (not a wall)
+q95_hard           = 2.0    # disruptive boundary; floors.toml holds 2.2
+n_min_e20          = 0.3    # low-density floor (runaway-prone / L-mode collapse below)
+
+[vessel]            # the passive conductor — the thing that MAKES the vertical mode slow
+# PHY-03/CTL-01: without this structure the axisymmetric vertical mode is ideal-MHD
+# (Alfvén-fast, uncontrollable). With it, gamma is set by the wall L/R time.
+b_over_a           = 1.35   # effective wall minor radius / plasma minor radius
+tau_wall_ms        = 25.0   # vessel L/R time (thick double-shell, SPARC-flavored choice)
+n_passive_filaments = 24    # axisymmetric filament circuits in the tier-1 model
+                            # (full mutual-inductance matrix M_pp/M_pc/M_p-plasma; built
+                            # GENERAL so it also carries quench eddy/halo forces later)
+# --- gamma, derived (never configured — PHY-03 rule) -------------------------------
+# The tier-1 code REPORTS gamma from the eigenproblem at each equilibrium; it moves with
+# l_i and kappa through the ramp. Design-point expectation from this vessel:
+#   gamma^-1 ≈ tau_wall · m_s ≈ 25 ms · ~1.0–1.6 (stability margin at kappa_sep 1.85,
+#   b/a 1.35) ≈ 25–40 ms — squarely the wall-set 10–100 ms class (D-016).
+# Control-rate justification (PHY-02's honest form): 10 kHz vertical loop = 250–400
+# samples per e-folding — chosen for disturbance rejection and actuator-lag headroom,
+# NOT because the instability is millisecond-scale. It is not.
+# Demo timing that derives from this: mm-scale seed → wall contact (~5–6 e-foldings)
+# ≈ 150–300 ms with VS off — the §6 toggle scene shows a WATCHABLE catastrophe (PHY-17).
+
+[coils]             # actuated circuits, v1 set (12): 3 CS modules + 4 PF up/down pairs + VS pair
+# scenario-scale electrical parameters; per-circuit L-R + mutuals live in the tier-1 model
+names        = ["CS1","CS2","CS3","PF1U","PF1L","PF2U","PF2L","PF3U","PF3L","PF4U","PF4L","VS1"]
+i_max_kAt    = [ 24,   24,   24,   14,    14,    14,    14,    10,    10,    8,     8,     10 ]
+v_max_V      = [ 1000, 1000, 1000, 600,   600,   600,   600,   600,   600,   600,   600,   2000 ]
+# VS1 is the in-vessel fast vertical pair (anti-series, low inductance, the 10 kHz actuator).
+cs_flux_swing_Wb = 40.0   # volt-second budget; ramp consumes ~17 Wb
+                          # (mu0 R Ip (l_i/2 + C_Ejima) with l_i 0.9, C_E 0.4), rest = flat-top
+
+[rates]             # machine-derived rate capabilities (floors.toml stays at-or-below)
+ip_ramp_max_MA_per_s = 1.0    # compact high-field class (PHY-27: 0.15 was ITER-scale slow);
+                              # nominal scenario ramp 0.7 MA/s → ~12 s ramp phase
+n_ramp_max_e20_per_s = 0.15   # line-averaged n̄_e (the interferometer measurand)
+
+[radiation]
+wall_reflectivity  = 0.8    # Trubnikov synchrotron free parameter (PHY-18) — matters at 12 T
+impurity_species   = "Ar"   # the line-radiation species (PHY-08): L_z(T) table, coronal fit
+impurity_seed_frac = 0.001  # n_imp/n_e baseline; puff scenarios raise it
+
+[alphas]
+E_alpha_MeV        = 3.52   # pinned (PHY-19: never 17.6 — that is E_fus)
+P_fus_over_P_alpha = 5.03   # 17.6/3.5
+confined_fraction  = 0.92
+slowing_down       = "one-pole lag, tau_s(T_e,n_e) Stix; ≈0.1–0.5 s at reference point"
+
+[disruption]        # scaling-grade constants the §2.4 model uses (PHY-06)
+T_post_TQ_keV      = 0.015  # post-thermal-quench temperature (10–20 eV class)
+tau_TQ_ms          = 0.5    # thermal quench duration (runs on the 100 µs path — PHY-24)
+tau_CQ_floor_ms    = 3.0    # ITPA area-normalized floor ~1.7 ms/m^2 × S_p 1.68 m^2
+L_p_uH             = 4.0    # mu0 R (ln(8R/a) - 2 + l_i/2), l_i 0.9
+# tau_CQ = L_p/R_p(T_post): at 15 eV, Zeff 2 → ~10 ms, clamped ≥ tau_CQ_floor. Halo
+# currents and runaway electrons are OUT OF SCOPE v1 (stated in spec §12).
+
+[initial_state]     # PHY-13: breakdown/burn-through is OUT OF SCOPE — runs begin
+Ip_MA      = 0.5    # plasma-initiated, post-burn-through handoff
+T_keV      = 0.3
+n_e20      = 0.3

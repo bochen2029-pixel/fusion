@@ -1,26 +1,78 @@
-# contracts/writs.toml — the downward grammar (v0 placeholders)
+# contracts/writs.toml — the downward grammar v1 (v0.2 revision; D-013/CTL-13/M-B3)
 # The cortex writes REFERENCES, never actuators. Every writ passes floors.toml gates;
-# a refused writ is receipted. Harm dial: H0 log-only, H1 auto within envelope,
-# H2 delayed-cancelable, H3 operator-confirm. v1 ships H0/H1 only.
+# refusals AND acceptances are receipted (M-M14/CTL-24b: the governor echoes every
+# accepted writ onto the sys lane, tick-stamped — the mind never mints its own belief
+# that a writ took effect).
+#
+# AUTONOMY DIAL (CTL-22 — replaces the non-monotone "harm dial"; ordered by real risk):
+#   A0 log-only (shadow) < A1 operator-confirm < A2 delayed-cancelable (objection window)
+#   < A3 auto-apply within envelopes.
+# v1 ships A0 for unsolicited initiative, A2 for voice-sourced numeric setpoints
+# (D-013's H2, renamed), A3 only for envelope-tightening writs. Effective autonomy =
+# min(writ-class autonomy, source autonomy, global dial).
+
+[envelope_fields]   # every writ carries these (the grammar's spine)
+id            = "u64, monotone per session"
+rev           = "u32, revision of this id (supersedes lower revs; last-writ-wins)"
+supersedes    = "optional id"
+ttl_s         = "float; expired writs are refused with receipt"
+formed_tick   = "u64; the tick whose evidence formed this writ (TinyVillage L2)"
+rev_observed  = "u64; newest bus rev the author had seen (M-B3 staleness gate)"
+source        = "mind | operator_voice | operator_typed"
+# Staleness law: the governor refuses any writ whose formed_tick is older than the writ
+# class's staleness window (below). The refusal is a receipt.
 
 [setpoint]
-params = ["Ip", "n_bar", "q_target", "P_aux"]
-fields = { value = "float", ramp = "float/s" }
-harm = "H1"
+params    = ["Ip", "n_bar", "q_target", "P_aux"]
+fields    = { value = "float", ramp = "float/s" }
+units     = { Ip = "MA", n_bar = "e20", q_target = "1", P_aux = "MW" }  # units are TYPED
+    # (CTL-24: the parser rejects unitless or mismatched-unit values; canonical SI table
+    # in the translator; floors compare in canonical units only)
+autonomy  = "A2"          # voice-sourced numeric setpoints: objection window + readback
+staleness_window_s = 5.0
+objection_window_s = 3.0  # SPINE-SIDE, counted in ticks (30000), never in the membrane
+readback  = "SETPOINT {param} {value}{unit} ramp {ramp}: applying in {window}s unless belayed"
 
 [mode]
-values = ["RAMP", "FLAT_TOP", "BURN", "RECOVERY", "SOFT_SHUTDOWN"]
-harm = "H1"
-# EMERGENCY_SHUTDOWN is spine-owned (a gate, not a writ) — the mind may REQUEST it (H1);
-# the spine may also fire it on its own floors, mind or no mind.
+values    = ["RAMP", "FLAT_TOP", "BURN", "RECOVERY", "SOFT_SHUTDOWN", "EMERGENCY_SHUTDOWN"]
+# EMERGENCY_SHUTDOWN as a WRIT is a REQUEST (CTL-23c: now expressible); the spine's own
+# gates (spine_gates.toml) fire without asking. A requested emergency shutdown at A1
+# (confirm) — the one writ where slower-but-sure beats fast-but-spoofable.
+autonomy  = { RAMP = "A2", FLAT_TOP = "A2", BURN = "A2", RECOVERY = "A2", SOFT_SHUTDOWN = "A2", EMERGENCY_SHUTDOWN = "A1" }
+staleness_window_s = 10.0
 
 [envelope]
-fields = { param = "string", min = "float", max = "float" }
-harm = "H1"          # may only TIGHTEN within floors.toml; never loosen past a floor
+fields    = { param = "enum(floors.plasma|floors.rates)", min = "float", max = "float" }
+# param is ENUMERATED against floors.toml keys (CTL-23b: no free strings cross the seam);
+# envelopes may only TIGHTEN within floors; never loosen past a floor.
+autonomy  = "A3"
+staleness_window_s = 30.0
+
+[schedule]          # CTL-23d: the temporal form §4.2 promised — ordered segments
+fields    = { param = "enum(setpoint.params)", segments = "array of {t_s, value, ramp}" }
+autonomy  = "A2"
+staleness_window_s = 10.0
 
 [priority]
-fields = { ordering = "string", horizon_s = "float" }
-harm = "H0"          # advisory to the scenario planner
+fields    = { ordering = "enum(divertor_over_Q | Q_over_divertor | survival_over_all)",
+              horizon_s = "float" }   # enumerated (CTL-23a), advisory to the planner
+autonomy  = "A0"
+staleness_window_s = 60.0
 
-[refusal]
-receipt_required = true   # every gate refusal lands on the tape, always
+[cancel]            # the revocation path (CTL-13)
+fields    = { target_id = "u64" }
+autonomy  = "A3"    # canceling is always safe and always allowed
+staleness_window_s = 60.0
+
+[receipts]
+refusal_receipt  = true   # every gate refusal lands on the tape, always, with reason
+accept_receipt   = true   # every acceptance echoes: [sys] writ accept id=N rev=R
+                          # setpoint Ip 8.5MA tick=T  (M-M14: the World mints the receipt)
+[input_tape]        # FRESH-6: the session replay law
+# The run artifact records, as REPLAYABLE INPUTS: every accepted writ (id, rev, payload,
+# accept tick) + the operator-input timeline (opv finals + opt lines, arrival ticks).
+# Replay feeds them at their recorded ticks — the booster's recorded-pilot pattern —
+# so a live-mind session replays bit-identically and F-GHOST's fork-vs-reality memcmp
+# is defined even when writs land inside the lookahead window. The cortex is NOT
+# replayed; its outputs are. (Goldens with no mind: empty tape.)
+recorded = ["writ_accepts", "opv_finals", "opt_lines"]

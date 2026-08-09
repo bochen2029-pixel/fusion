@@ -1,0 +1,39 @@
+# contracts/scenarios/_TEMPLATE.toml — the scenario schema (v0.2; REPO-B2 + PHY-05/16)
+# Every scenario file MUST carry every table below (copy this file; delete no keys).
+# A scenario = this config + a seed. Same (file, seed) ⇒ bit-identical trajectory.
+# Units are IN THE KEY NAMES, floats in values (P-04 law). Pre-register before tuning.
+
+[meta]
+name         = "_TEMPLATE"
+class        = "curriculum"   # curriculum | demo | gate | lethal_legal
+# lethal_legal (FRESH-3): passes EVERY floor and still kills the plasma inside the ghost
+# horizon — the only class on which ghost-vs-governor value separates. F-PRESENCE-F's
+# planted-error battery draws >= 5 cases from this class.
+description  = "one line"
+activates_at = "M0"           # first milestone that runs it
+
+[phases]      # the mission script; times are targets, not clamps (physics can end it)
+sequence     = ["flat_top"]   # from: ramp | flat_top | burn | rampdown
+duration_s   = 30.0           # total sim time at nominal
+
+[initial]     # overrides of machine.toml [initial_state] / [operating_point]; jittered
+              # per dispersions.toml [initial_jitter]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[disturbances]  # list; timing/magnitude distributions resolve via dispersions.toml.
+# type ∈ { sawtooth (STATE-triggered), elm (STATE-triggered), impurity_puff, nbi_trip,
+#          coil_fail (name which), pellet, vde_kick, hl_backtransition, rampdown_cmd }
+events = []     # e.g. [{ type = "impurity_puff" }, { type = "vde_kick" }]
+
+[pass]        # the pre-registered pass criterion (PHY-16 — a number a receipt can hold)
+metric        = "Q_sustained"     # Q_sustained | flat_top_held | survival
+q_min         = 1.0
+hold_s        = 10.0              # metric must hold this long, through the disturbances
+seed_count    = 1000
+pass_frac     = 0.90              # scenario passes if >= this fraction of seeds pass
+ci            = "wilson95"        # reported lower bound must clear pass_frac - 0.02
+
+[dispersions]
+profile       = "default"         # named profile in dispersions.toml; "none" only for goldens

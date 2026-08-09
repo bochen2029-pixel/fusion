@@ -1,40 +1,77 @@
-# contracts/events.toml — the tokenizer of machine experience (v0 placeholders)
-# Pre-registered: changing a threshold = a D-entry in DECISIONS.md.
-# The plant earns tokens only by surprising its cerebellum (innovation) or crossing a
-# named line. Nominal = ticks. Budget law: nominal hour <= ~100 tokens.
+# contracts/events.toml — the tokenizer of machine experience (v1; v0.2 revision)
+# Pre-registered: changing a threshold = a D-entry. THE VOCABULARY FREEZES AT M3
+# (TinyVillage L3 / M-M13): after the first logged shadow tick the event vocabulary is
+# append-only forever — earlier ledgers must stay trainable. (Fusion nuance: the machine
+# lanes CAN be regenerated from seeds+goldens; the freeze binds hardest on opv/opt.)
+# The plant emits FIXED-SIZE POD STRUCTS over an SPSC ring; membrane/ renders text
+# (M-M11) — text never exists on the plant thread. sigma = as defined by the EKF's
+# innovation covariance, NIS-calibrated at M1 (D-023); until the EKF passes its
+# chi-square acceptance, these thresholds are provisional by definition.
 
 [innovation]
-# QC fix (CTL-B3 + PHY, independently): per-channel per-sample thresholds fire ~1080
-# events/s at 3 sigma — 4-5 orders over budget. Innovation is therefore computed on the
-# WINDOWED CLUSTER RESIDUAL (aggregation_window_ms), one event max per cluster per window;
-# sustained storms collapse to one "storm" summary event + counter (the flood->rate-cap
-# immune row, inherited from fabric.h's self-attack lab).
+# CTL-B3 + PHY: per-channel per-sample z-tests fire ~1080/s at 3sigma. Innovation
+# therefore fires on the PER-CLUSTER MAHALANOBIS statistic over a decimated window,
+# one event max per cluster per window, dwell + refractory, storm collapse above.
 aggregation_window_ms = 250
-sigma_token = 3.0        # windowed cluster residual >= 3 sigma -> one event token
-sigma_alarm = 5.0        # >= 5 sigma -> priority event (band should dwell)
-storm_collapse_after = 4 # >4 events from one cluster in 10 s -> storm summary + counter
+dwell_windows   = 2        # N-of-M: statistic must exceed threshold 2 consecutive windows
+refractory_ms   = 1000     # per-cluster minimum gap between events
+storm_collapse_after = 4   # >4 events from one cluster in 10 s -> one storm summary + counter
 clusters = ["vertical", "radial", "density", "current", "thermal"]
+# Per-cluster thresholds (PHY: magnetics 10 kHz and neutrons 1 kHz cannot share one sigma;
+# correlated-array motion makes the cluster statistic the only correct form):
+sigma_token = { vertical = 3.5, radial = 3.5, density = 3.0, current = 3.0, thermal = 3.0 }
+sigma_alarm = { vertical = 5.0, radial = 5.0, density = 5.0, current = 5.0, thermal = 5.0 }
 
 [ticks]
-nominal_interval_s = 300 # "[tick +300s nominal Q=...]" — QC fix: 30 s ticks alone were
-                         # 12-14x the stated budget; 5-min ticks ~ 96 tok/hr
+nominal_interval_s = 300   # "[tick 300s Q=8.1 nominal]" ~8 tok -> ~96 tok/hr
 include_q = true
 
-[limits]                 # proximity events fire at frac_warn, again at frac_alarm
-greenwald  = { warn = 0.80, alarm = 0.92 }
-q95        = { warn = 2.6,  alarm = 2.35 }   # floor itself lives in floors.toml
-beta_n     = { warn = 0.85, alarm = 0.95 }   # fraction of the Troyon-ish limit
+[limits]                   # proximity events; dir says which way danger lies (P-05)
+greenwald  = { warn = 0.80, alarm = 0.92, dir = "above" }
+q95        = { warn = 2.6,  alarm = 2.35, dir = "below" }   # floor 2.2 in floors.toml
+beta_n     = { warn = 0.85, alarm = 0.95, dir = "above" }   # fraction of machine.toml troyon_C
+density_low = { warn = 0.45, alarm = 0.36, dir = "below" }  # of n_min*1.2; runaway-prone
+
+[terminal]                 # M-M3: the plasma's death has tokens (ships WITH §2.4 physics)
+# [plant] terminal vde z=+0.19m gamma_inv=28ms      cause chain is part of the token
+# [plant] terminal quench tau_cq=11ms ip 8.5->0.3MA
+# [plant] terminal disrupt cause=greenwald f=1.07
+# [sys]   shutdown spine gate=vde_detected           spine-initiated (its own class)
+values = ["vde", "thermal_quench", "current_quench", "disrupt", "soft_shutdown", "hard_shutdown"]
+cause_required = true
+
+[organ]                    # organ trips/failures, distinct from saturation (M-M3)
+# [plant] organ gs_late window=2                     missed GS window (PHY-11) — ALWAYS tokenizes
+# [plant] organ nbi2 trip / [plant] organ probe17 fail
+# [sys]   organ mind_died pid=... last_rev=N         cortex-host watchdog receipt (FE-20)
+report = ["gs_late", "actuator_trip", "sensor_fail", "mind_died", "asr_died", "tts_died"]
+
+[phase]                    # scenario phase boundaries tokenize (M-M3)
+# [plant] phase RAMP->FLAT_TOP t=12.4s
+report_transitions = true
 
 [controller]
-saturation_min_s = 0.5   # coil saturated longer than this -> event
-report_drop_events = true # the cerebellum's own deadline misses always tokenize
+saturation_min_s = 0.5     # coil saturated longer than this -> event
+report_drop_events = true  # the cerebellum's own deadline misses always tokenize
 
-[health]
-drift_sigma = 1.0        # slow-organ drift threshold (per 5-minute window)
+[health]                   # FRESH-5 fix: 1.0 sigma fired ~32%/organ/window = 300-400 tok/hr
+drift_sigma  = 2.5         # of the per-organ drift statistic's calibrated null
+dwell_windows = 3          # 3-of-4 five-minute windows -> expected false rate ~0/hr
+window_s     = 300
+
+[cascade]                  # M-B7: the three room guards (auricle smoke-1: 49% fire-rate,
+# "trunk ate itself"). Guard 1 (self-echo: minds never judge boundaries on shadow/self
+# lanes — the lane stamp gives it free) and the per-seat caps live in the membrane spec;
+# this block is guard 3, the mechanical breaker.
+fire_rate_window_s = 30
+demote_above       = 0.30  # rolling emit/boundary ratio -> auto-demote to pure-watch
+demote_event       = true  # the demotion itself is a [sys] receipt, always
 
 [budget]
-# THE single source of truth for the budget law (spec §4.1 prose cites this table).
-# Nominal: ticks (~96/hr) + slack => the cap below. Crisis: enforced by the tokenizer;
-# overflow collapses to storm summaries, never dropped percepts (the gate rule).
-max_tokens_per_hr_nominal = 150
-max_tokens_per_s_crisis = 40
+# THE single source of truth for the budget law (spec §4.1 cites this table).
+max_tokens_per_hr_nominal = 150   # ticks ~96/hr + slack
+max_tokens_per_s_crisis   = 40    # enforced by the tokenizer as a hard shaper:
+# overflow COALESCES ("[plant] +7 suppressed innov vertical" — M-M4), never silently drops;
+# the coalesce line is itself the receipt. Plant-lane boundary coalescing: one boundary
+# per 300 ms max in crisis (M-M7's standing mitigation), pre-registered here.
+crisis_boundary_min_ms = 300

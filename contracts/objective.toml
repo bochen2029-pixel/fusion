@@ -1,0 +1,46 @@
+# contracts/objective.toml — THE objective (v0.2; CTL-07/CTL-B15; D-022)
+# ONE objective, EVERY consumer: the PPO/MPO reward, the CEM/MPPI teacher cost, and the
+# null's tuning cost (the PID/LQ gains are CEM-tuned against THIS file — CTL-29) all read
+# this table. Same discipline as one-dynamics-source. F-NULL-C is fair by construction
+# only while this holds. Changing a weight = a D-entry.
+
+[tracking]          # quadratic costs on tracking error, per unit stated
+z_position_m      = 400.0   # vertical position error (the enemy) — per (m)^2
+r_axis_m          = 100.0
+ip_MA             = 4.0
+n_bar_e20         = 2.0
+q_setpoint        = 1.0     # Q tracking (burn control)
+shape_proxy       = 50.0    # M1+: boundary-gap proxy from GS (defined with the solver)
+
+[actuators]
+effort            = 0.01    # per-normalized-command^2 (v/v_max)
+slew              = 0.05    # per-normalized-slew^2 — penalizes bang-bang chatter
+
+[limit_proximity]   # smooth barrier terms INSIDE the floors (the governor refuses at the
+style             = "quadratic-hinge"     # floor; the objective discourages loitering near it)
+onset_frac        = 0.9     # barrier turns on at 90% of the floor margin
+weight            = 20.0
+
+[terminal]          # episode termination classes and their costs (MC verdict taxonomy)
+# CTL-10: spine-triggered shutdown IS a failure class — a controller rescued by the
+# plant's own safety gates has failed, and both F-NULL-C arms count it that way.
+classes           = ["GOOD", "DISRUPT", "SPINE_SHUTDOWN", "TIMEOUT"]
+disrupt_cost      = 10000.0
+spine_shutdown_cost = 6000.0   # bad, but better than an uncontrolled disruption — the
+                               # ordering must not invert or policies farm the gates
+timeout_cost      = 0.0        # ran the full scenario = GOOD unless criteria say otherwise
+
+[seeds]             # the held-out seed law (CTL-08/CTL-12; enforced IN CODE, parent pattern)
+# Philox key layout: run_key = (scenario_id << 32) | seed. Seed domains:
+train_seeds       = "0..799999"
+eval_seeds        = "800000..899999"     # dev-eval, reported but not gated on
+gate_seeds        = "900000..999999"     # the falsifier domain — the TRAINER HARD-REFUSES
+                                          # to generate these (ctest: seedcheck)
+crn               = true    # common random numbers: all F-NULL-C arms run the SAME seed
+                            # list, same disturbance realizations (paired comparison)
+
+[stats]             # the statistics falsifiers use (CTL-08(5))
+rate_ci           = "wilson95"           # for GOOD/DISRUPT/SPINE_SHUTDOWN rates
+rms_test          = "paired-bootstrap-bca-95"  # Wilson cannot apply to RMS
+decision_rule     = "lexicographic: (1) disrupt+spine rate lower-CI must not worsen;
+                     (2) then tracking RMS must improve; split outcomes = the null wins"

@@ -114,3 +114,84 @@ cross-session with the operator ratifying.*
   operator** — recommended cut for v1, sanctioned compromise = renderer raymarches
   tier-1-derived emissivity + artistic noise; the ruling lands as its own D-entry in
   v0.2 either way.
+
+*The following are the v0.2 revision session's design rulings (S3; spec
+`FUSION_ARCHITECTURE_v0.2.md`; full traceability in `docs/qc/DISPOSITIONS.md`).*
+
+- **D-021 · 2026-08-09 · FUSOR-1 pinned** (`contracts/machine.toml`): synthetic compact
+  high-field machine (R 1.85 m, a 0.57 m, κ_a 1.65, B₀ 12 T, I_p 8.5 MA, thick vessel
+  τ_w 25 ms, 24 passive filaments, 12 actuated circuits). Both load-bearing numbers
+  derived from the one config, arithmetic in-file: Q ≈ 2.3 at H98 = 1 (Q > 1 needs
+  H98 ≳ 0.85 — passable, not trivial) and γ⁻¹ ≈ 25–40 ms wall-set (reported from the
+  eigenproblem at runtime, never configured). Executes PHY-01/02/03 + FRESH_EYES D1.
+- **D-022 · 2026-08-09 · One objective, one stochastic model, one seed law.**
+  `contracts/objective.toml` (all three consumers: trainer reward, teacher cost, null's
+  tuning cost; SPINE_SHUTDOWN a terminal failure class with cost ordering that defeats
+  gate-farming — CTL-07/10) + `contracts/dispersions.toml` (observable/blind split,
+  Philox stream domains per D-011, state-triggered disturbances carry no stream to leak)
+  + code-enforced seed partition (train/eval/gate; trainer hard-refuses gate seeds;
+  `seedcheck` ctest) + stats law (Wilson for rates, paired bootstrap for RMS,
+  lexicographic decision rule). Pre-registered before any tuning exists (CTL-12's
+  retroactivity trap avoided).
+- **D-023 · 2026-08-09 · The EKF, fully specified** (CTL-11 + FRESH-4):
+  model = the linearized vertical/circuit tier (one dynamics source, linearized), inputs =
+  `contracts/diagnostics.toml` channels only; **information set pre-registered: never the
+  disturbance schedule, never blind-dispersion truths, never scenario flags — its
+  parameters carry the plant_scatter mismatch** (the epistemic handicap IS what makes
+  innovation informative in a simulator); covariance carries across re-linearizations;
+  **rolling NIS χ² is a pre-registered M1 acceptance gate** — events.toml σ-thresholds
+  are provisional until it passes. Plumbing: policy consumes EKF state + innovation
+  vector (CTL-21, hide-the-flags acceptance test); the tokenizer computes from the EKF
+  residual only.
+- **D-024 · 2026-08-09 · MPPI/CEM is OFFLINE-only, and the GS solve is pipelined by
+  construction.** The planner is the teacher; it never runs in play mode (resolves
+  CTL-06/V-12; §1/§7 rows follow; D-006's rationale restated onto the standing EKF). The
+  200 Hz GS solve scheduled at tick T applies at tick T+50 — deterministic in sim time;
+  if wall-late the sim WAITS (pacing dips, `gs_late` receipted; determinism is never
+  traded); the linear model's ΔZ validity bound triggers an early re-solve. F-KEEPUP-F
+  is defined on aggregate pacing (PHY-11).
+- **D-025 · 2026-08-09 · The M2 ladder** (supersedes D-002's "solver-then-distill" as
+  sole doctrine; the parent's honest wall respected): (a) θ/gain-schedule net over the
+  CEM-tuned PID+LQ base — the parent's proven GREEN, **F-NULL-C satisfiable here**;
+  (b) residual policy; (c) end-to-end distill (the parent's 0/16 null) or pure sim-RL
+  MPO (TCV's actual pipeline; PPO only with KL-to-teacher). DAgger named for any distill
+  rung. The null ships in-binary as a permanent arm (L11); MPC is a later separately-
+  receipted comparison (D-020).
+- **D-026 · 2026-08-09 · Ghost mode declared + F-GHOST rescoped** (supersedes D-009's
+  fork-vs-reality memcmp phrasing): ghost = frozen-equilibrium tier-0 burn + linearized
+  vertical/circuit dynamics on the plant's shared Philox stream. F-GHOST = (i)
+  ghost-vs-ghost memcmp; (ii) bounded divergence vs the full plant (|ΔZ| < 2 cm,
+  |ΔQ| < 0.5 at 500 ms), published either way; (iii) warning-precedes-governor-accept on
+  the tape. Sentinel interjection on fork-verdict is a templated deterministic line with
+  pre-warmed TTS (~0.4 s into the 3 s objection window) — the guarantee is structural
+  (M-B5/V-03).
+- **D-027 · 2026-08-09 · Arbitration + budgets.** GPU: one plant-owned CUDA context at
+  greatest stream priority; the LLM is the preemptible party; ASR/TTS/policy never touch
+  CUDA. CPU: §7.3 core map (spine spin isolated on a P-core; degradation order ends at
+  "never the tick"). The 100 µs tick has a line-item budget (§7.4), p99.9 binding,
+  measured with the LLM hot at the **M3** gate. Telemetry: 64³ @ 10 Hz shared-memory,
+  42 MB/s, renderer may never backpressure.
+- **D-028 · 2026-08-09 · Membrane mechanics batch.** Plant-lane boundaries are structural
+  (M-B6); all three room guards are law (self-echo lane rule, per-seat caps, cascade
+  breaker in `events.toml [cascade]`); Sentinel emit is fork-gated (M-M2); molt-on-calm
+  with crisis shed-oldest fallback (M-M6); event vocabulary freezes at M3 (L3/M-M13);
+  the tape is durable (auricle `durable.h` pattern; FRESH-8); the cortex host has a
+  watchdog and `mind_died` is a tape event (FE-20); `tts.h` is a contract (clause-grain
+  streaming, ≤ 60 ms queued-PCM cap, sample-accurate abort — V-09/10/15/16).
+- **D-029 · 2026-08-09 · The falsifier registry v2** (nine, each with a named rig and a
+  losing branch): F-BURN-0 and F-SHAPE-1 promoted (M0/M1 have falsifiers — P-13);
+  F-KEEPUP-F on aggregate pacing; F-NULL-C v2 (matched wall-clock+VRAM, CRN, three rates);
+  F-GHOST per D-026; F-VOICE with t₀/t₁ + device-named receipts + speakers-mode negative
+  test; **F-VERACITY** (code-graded truth-of-speech, gates M4); F-PRESENCE-F three-arm
+  with the operator as L12-calibrated grader; F-INSTINCT with its held-out set created
+  and quarantined at M3. The three-arm result is publishable either way (D-018's
+  narrowed claim makes "the event-triggered twin closes the gap" a finding, not a
+  failure).
+- **D-030 · 2026-08-09 · Spine gates + autonomy dial + writ grammar v1 shipped.**
+  `contracts/spine_gates.toml` (deterministic predicates, dwell, hysteresis,
+  false-positive budgets, SPINE_SHUTDOWN failure class, gates-always-armed — including
+  during the M5 toggle demo); the autonomy dial A0<A1<A2<A3 in true risk order replaces
+  the harm dial (CTL-22; effective = min(class, source, global)); `contracts/writs.toml`
+  v1 (id/rev/supersedes/ttl/cancel/schedule, typed units, formed_tick + rev_observed
+  staleness gates, acceptance receipts, the session input-tape — FRESH-6). v1 ships A0
+  unsolicited / A2 voice numeric setpoints / A3 envelope-tightening only.

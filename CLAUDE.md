@@ -1,7 +1,8 @@
 # fusion — session charter
 
-The reactor you can talk to. Read **[FUSION_ARCHITECTURE_v0.1.md](FUSION_ARCHITECTURE_v0.1.md)**
-(the canon — spec + QC pass), **[ROADMAP.md](ROADMAP.md)** (current milestone + exit gates),
+The reactor you can talk to. Read **[FUSION_ARCHITECTURE_v0.2.md](FUSION_ARCHITECTURE_v0.2.md)**
+(the canon — the QC revision; v0.1 is frozen history, never build against it),
+**[ROADMAP.md](ROADMAP.md)** (current milestone + exit gates),
 and the **tail of [SESSION_LOG.md](SESSION_LOG.md)** (the state of truth — the last entry is
 where the project actually is) before changing anything. The next work is the first unchecked
 milestone in ROADMAP.md unless SESSION_LOG's tail says otherwise.
@@ -56,21 +57,42 @@ milestone in ROADMAP.md unless SESSION_LOG's tail says otherwise.
 
 Namespace `fusion`; headers are contracts; SPSC rings for thread edges (steal
 `auricle/src/core/ring.h` pattern); vendored + pinned third_party (no package managers in
-the product build); tests are assert-based exes under ctest; `contracts/*.toml` tables are
-pre-registered — change = a D-entry.
+the product build; TOML parser = tomlplusplus v3.4, pinned); tests are assert-based exes
+under ctest; `contracts/*.toml` tables are pre-registered — change = a D-entry; milestone
+branches are `m<N>-<slug>`, `main` merges at gates; **no locks, heap allocations, or
+syscalls on hot paths** (the 100 µs tick and the audio path — auricle's law, inherited).
 
 ## Glossary (mandatory terms — drift fails review)
 
-**fusor** (the core binary) · **the warpbus** (the estate's shared two-plane bus: an
-append-only committed-rev tape + an ephemeral reflex plane of forming partials — the
-medium every lane below rides; SYNCYTIUM's fabric, here) ·
-**spine/cerebellum/cortex/depths** (the four tiers) ·
-**innovation** (sensor minus cerebellum prediction; the upward gate) · **writ** (a typed
-downward reference; never an actuator) · **floor** (a governor limit the mind cannot cross) ·
-**ghost** (a forked-physics counterfactual, before-commit) · **drop-event** (a recorded
-deadline miss) · **the tokenizer of machine experience** (`membrane/`'s event emitter) ·
-**solicited vs unsolicited** speech (answers vs initiative; D-007) · **the null** (the
-baseline every organ must beat).
+**fusor** (the core binary) · **FUSOR-1** (the pinned synthetic machine, `contracts/machine.toml`) ·
+**the warpbus** (the estate's shared two-plane bus: an append-only committed-rev **tape**
+(durable, hash-chained) + an ephemeral **reflex plane** of forming partials) ·
+**spine/cerebellum/cortex** (the three tiers; the depths tier was cut at v0.2 — D-020) ·
+**innovation** (sensor minus the EKF's prediction, NIS-calibrated; the upward gate) ·
+**writ** (a typed downward reference; never an actuator) · **floor** (a governor limit the
+mind cannot cross) · **spine gates / SPINE_SHUTDOWN** (the spine's own safety trips —
+counted as a FAILURE class, never a rescue) · **ghost** (a forked-physics counterfactual,
+before-commit; fires only via governor-accept's objection window) · **drop-event** (a
+recorded deadline miss) · **the tokenizer of machine experience** (`membrane/`'s event
+emitter; plant-lane boundaries are structural) · **solicited vs unsolicited** speech
+(answers vs initiative; D-007) · **the autonomy dial** (A0 log < A1 confirm < A2
+delayed-cancelable < A3 auto — risk-ordered; replaced the harm dial) · **the null** (the
+baseline every organ must beat; ships in-binary) · **the input tape** (accepted writs +
+operator timeline, recorded as replayable inputs) · **lethal-legal** (a scenario class:
+floor-legal commands that still kill the plasma — where ghost value separates from the
+governor) · **molt** (the mind folds its own overgrown trunk to a scribe rung; ~9 s
+outage, fired on calm) · **trunk/rung/rev/lane/seat** (the shared KV context / a
+compressed running-memory / one committed bus message / a bus channel / one of the three
+minds) · **L-SILENCE** (silence is priced and meaningful — ticks) · **the free-tail razor**
+(the {hold,emit} judgment rides free on the ingest forward pass's logit tail) · **the
+demesne pattern** (abortable word-grain output — the estate's composition-public law) ·
+**dial-at-zero** (emit gating with zero suppression — the over-fire baseline, 921/hr) ·
+**truth lane** (a slower, higher-accuracy ASR pass used as reference, e.g. Parakeet).
+Tokamak terms: **VDE** (vertical displacement event — the enemy) · **Greenwald fraction**
+(n̄/n_GW, empirical disruptive density boundary) · **q95** (edge safety factor; danger is
+LOW) · **β_N (Troyon)** (normalized pressure limit) · **κ/δ** (elongation/triangularity;
+κ_a is the area definition IPB98 uses) · **MPPI/CEM** (sampling planners — the offline
+teacher here) · **EKF/NIS** (the innovation source and its consistency statistic).
 
 ## For spawned subagents (they inherit nothing)
 

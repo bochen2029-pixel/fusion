@@ -1,20 +1,27 @@
-# contracts/floors.toml — the governor (v0 placeholders; deterministic, spine-enforced)
-# The mind cannot cross these at any harm level. Changing a floor = a D-entry.
-# Values are scenario-scale placeholders until M1 pre-registers the real machine config.
+# contracts/floors.toml — the governor (v1; v0.2 revision; deterministic, spine-enforced)
+# The mind cannot cross these at ANY autonomy level. Changing a floor = a D-entry.
+# Values derive from contracts/machine.toml [limits]/[rates] with deliberate margin —
+# floors sit BELOW the machine's boundaries on purpose (every one of them, PHY-21).
+# Units in the KEY, floats in the value (P-04). dir = which side is safe.
+# activates_at: floors whose measurand does not exist yet are DORMANT, not stubbed (PHY-25).
 
 [plasma]
-q95_min = 2.2
-greenwald_max = 0.95     # governor margin below the physical limit (=1.0) on purpose
-beta_n_max_frac = 1.0    # of the configured Troyon-ish limit
+q95_min            = { value = 2.2,  dir = "above", activates_at = "M1" }  # machine hard 2.0
+greenwald_max_frac = { value = 0.95, dir = "below", activates_at = "M0" }  # of the EMPIRICAL
+    # disruptive boundary n_GW (NOT a physical wall — H-mode with pellets exceeds it; PHY-23)
+beta_n_max_frac    = { value = 0.90, dir = "below", activates_at = "M1" }  # of troyon_C = 2.8
+    # (was 1.0 — zero margin contradicted the Greenwald pattern; PHY-21)
+n_min_e20          = { value = 0.36, dir = "above", activates_at = "M0" }  # 1.2 x machine
+    # n_min: low density is a hazard too (runaway-prone, L-mode collapse) — PHY addition
 
-[rates]
-ip_ramp_max = "0.15MA/s"
-n_ramp_max = "0.05e20/s"
+[rates]             # at-or-below machine.toml [rates]
+ip_ramp_max_MA_per_s   = { value = 0.85, dir = "below", activates_at = "M0" }
+n_ramp_max_e20_per_s   = { value = 0.12, dir = "below", activates_at = "M0" }
+    # measurand: line-averaged n_bar_e (the interferometer's quantity — PHY-26)
 
 [coils]
-current_max_frac = 0.95
-temp_max_frac = 0.90
+current_max_frac = { value = 0.95, dir = "below", activates_at = "M1" }  # of machine i_max_kAt
+temp_max_frac    = { value = 0.90, dir = "below", activates_at = "M1" }
 
-[spine_autonomy]
-# The spine fires these itself, mind present or not:
-emergency_shutdown_on = ["vde_detected", "quench_precursor", "coil_overtemp"]
+# Spine autonomy moved to contracts/spine_gates.toml (CTL-09: this file is what the mind
+# cannot CROSS; the gates are what the spine FIRES — different objects, different owners).

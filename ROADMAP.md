@@ -1,11 +1,13 @@
 # fusion — roadmap
 
 The next phase to build is the **first unchecked milestone**. A milestone is DONE only per
-[DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) — gate falsifier green with receipts, nulls
-reported, docs synced in the same commit. Spec: [FUSION_ARCHITECTURE_v0.1.md](FUSION_ARCHITECTURE_v0.1.md) §9.
+[DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) — gate green with receipts, nulls reported,
+docs synced in the same commit. Spec: [FUSION_ARCHITECTURE_v0.2.md](FUSION_ARCHITECTURE_v0.2.md) §9.
 Decisions live in [DECISIONS.md](DECISIONS.md) (append-only).
+**Current kickoff: [`KICKOFF_M0.md`](KICKOFF_M0.md)** — the finishing session updates this
+line (P-15's structural pointer).
 
-- [ ] **V0.2 — the QC-swarm revision (MANDATORY BEFORE M0; bootstrap: `KICKOFF_SPEC_V02.md`;
+- [x] **V0.2 — the QC-swarm revision (MANDATORY BEFORE M0; bootstrap: `KICKOFF_SPEC_V02.md`;
       scoped 2–4 sessions, machine.toml first).** Disposition all 39 blockers + 60 majors
       from the five-auditor pass (`docs/qc/QC_CONSOLIDATED.md` + lane reports) **and the
       fresh-eyes second-instrument findings (`docs/qc/FRESH_EYES.md` — D-018)**. Core
