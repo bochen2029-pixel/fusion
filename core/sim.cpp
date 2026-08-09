@@ -3,6 +3,7 @@
 // Philox draws at init only (M0). Same (scenario, seed) => bit-identical trajectory.
 #include "sim.h"
 #include "philox.h"
+#include "vertical.h"
 #include <cmath>
 #include <algorithm>
 
@@ -88,10 +89,68 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     };
     ev(0, EvKind::PhaseStart, 0, sc.Ip_MA, 0.0);
 
+    // ---- M1 slice 1: the vertical channel (D-035) ----------------------------------
+    // Decoupled from the burn at this slice except: the vde gate kills heating, and
+    // wall contact enters the shared TQ path. gamma is REPORTED from the eigenproblem.
+    VerticalModel vmod; VerticalEKF vekf; InnovGate vig;
+    double xvert[VerticalModel::N] = {0};
+    double probe_bias = 0.0; int vde_dwell = 0; bool vde_gate_fired = false;
+    uint64_t kick_tick = ~0ull;
+    const InnovCfg icfg = in.ic;       // events.toml [innovation], loaded by the caller
+    if (sc.vert_on) {
+        vmod.build(m);
+        r.gamma_wall = vmod.gamma_wall; r.gamma_open = vmod.gamma_open;
+        xvert[0] = in.d.z0_mm * 1e-3 * b1.g1;              // the drawn z0 jitter, at last
+        vekf.init(vmod, 0.75e-3);                          // 4 probes averaged, 1.5 mm each
+        if (sc.vde_kick) {
+            const double kt = sc.kick_t_lo + (sc.kick_t_hi - sc.kick_t_lo) * b4.u1;
+            kick_tick = uint64_t(kt / DT_TICK + 0.5);      // b4.u1: drawn-reserved, now used
+        }
+    }
+
     for (uint64_t tick = 0; tick <= n_ticks; ++tick) {
         const double t = double(tick) * DT_TICK;
 
         if (tick == puff_tick && mode == RUN) s.nimp += sc.puff_mag * s.ne;  // the event
+
+        // ---- vertical channel, per tick (10 kHz control + EKF + innovation gate) ----
+        if (sc.vert_on && mode == RUN) {
+            if (tick == kick_tick) xvert[0] += sc.kick_mm * 1e-3;
+            // observer-in-the-loop (CTL-11/21): the VS PD feeds back the EKF ESTIMATE
+            double Vcmd = 0.0;
+            if (sc.vs_on) {
+                const double fz = k.vs_truth ? xvert[0] : vekf.xz;
+                const double fv = k.vs_truth ? xvert[1] : vekf.xv;
+                Vcmd = std::clamp(-(k.Kpz * fz + k.Kdz * fv), -2000.0, 2000.0);
+            }
+            vmod.step_rk4(xvert, Vcmd, DT_TICK);
+            r.z_max_m = std::max(r.z_max_m, std::fabs(xvert[0]));
+            // synthetic probes (diagnostics.toml magnetics): noise + bias random walk
+            const Gauss2 gn = gauss2(seed, 3u, sc.scenario_id, uint32_t(tick & 0xFFFFFFFFu));
+            probe_bias += 3.0e-6 * gn.g1;                  // 0.001 FS/s walk, FS 0.3 m
+            const double z_meas = xvert[0] + probe_bias + 0.75e-3 * gn.g0;
+            vekf.predict(xvert[2 + VerticalModel::NP], DT_TICK);   // I_vs is a measured coil channel
+            vekf.update(z_meas);
+            const double mag = vig.feed(vekf.innov_last, vekf.S_last, icfg.window_ticks,
+                                        icfg.sigma_token_vertical, icfg.sigma_alarm_vertical,
+                                        icfg.dwell_windows, icfg.refractory_ticks);
+            if (mag > 0) { ev(tick, EvKind::Innov, 0, mag, xvert[0]); ++r.innov_events; }
+            // spine gate [vde_detected]: fires, receipts, kills heating — and honestly
+            // cannot re-stabilize an uncontrolled mode (spine_gates [demo_interaction])
+            if (std::fabs(xvert[0]) > in.g.z_trip_m && std::fabs(xvert[1]) > in.g.zdot_trip)
+                ++vde_dwell; else vde_dwell = 0;
+            if (vde_dwell >= in.g.vde_dwell_ticks && !vde_gate_fired) {
+                vde_gate_fired = true;
+                ev(tick, EvKind::GateFire, 1, xvert[0], xvert[1]);
+            }
+            // wall contact -> the shared terminal path (TQ cause=vde)
+            if (std::fabs(xvert[0]) > 0.19) {
+                mode = TQ; W_preTQ = s.W;
+                W_postTQ = 3.0 * s.ne * m.V * m.T_postTQ_keV * E_KEV_J;
+                tq_ticks_left = int(m.tauTQ_ms * 1e-3 / DT_TICK + 0.5);
+                ev(tick, EvKind::TerminalTQ, 2, xvert[0], d.T);
+            }
+        }
 
         if (mode == RUN && tick % SUBCYCLE == 0) {
             d = derive(s, m, H98);
@@ -106,6 +165,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             const double rad_ff = k.Krad * std::max(0.0, d.Prad - prad_avg);
             double p = (k.P_ff_MW + pidT.step(eT, dt_pid, k.Kp, k.Ki, k.Kd, ok_T)) * 1e6
                      + rad_ff;
+            if (vde_gate_fired) p = 0.0;               // gate response: bound the energy
             p = std::clamp(p, 0.0, Pmax);
             const double slew = m.slew_MW_per_s * 1e6 * dt_pid;              // rate floor
             p = std::clamp(p, paux_cmd_prev - slew, paux_cmd_prev + slew);
@@ -217,6 +277,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     }
 
     if (!terminated) { r.verdict = Verdict::GOOD; r.t_end = sc.duration_s; }
+    if (sc.vert_on) r.nis_mean = vekf.nis_mean();
     r.minQ_window = (minQ > 1e29) ? 0.0 : minQ;
     r.q_rms = q_n ? std::sqrt(q_se / double(q_n)) : 0.0;
     r.effort = eff_n ? eff / double(eff_n) : 0.0;

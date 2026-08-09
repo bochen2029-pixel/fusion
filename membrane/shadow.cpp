@@ -183,6 +183,7 @@ static int mode_gen_feed(const std::string& root, const std::string& scen_path,
     in.d = load_dispersions(root + "/contracts/dispersions.toml");
     in.s = load_scenario(scen_path);
     in.k = load_gains(root + "/control/gains_m0.toml");
+    in.ic = load_innov(root + "/contracts/events.toml");
     RunResult r = run_sim(in, seed, true);
     // null mode (M-M9): ticks-only at 150 s cadence — the fixed-cadence summarizer at
     // approximately matched token budget; the tokenizer's event lines are withheld.

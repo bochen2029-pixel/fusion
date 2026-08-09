@@ -36,12 +36,24 @@ struct FloorsCfg {
     double ip_ramp = 0.85, n_ramp = 0.12;
 };
 
-struct GatesCfg {                    // contracts/spine_gates.toml (M0-active subset)
+struct GatesCfg {                    // contracts/spine_gates.toml (M0/M1-active subset)
     int    qp_dwell_ticks = 50;      // quench_precursor dwell
     double frad_trip = 1.0;          // f_rad threshold (predicate)
     double t_drop_frac = 0.5;        // T_e halving over tau_ms
     double t_drop_tau_ms = 2.0;
+    double z_trip_m = 0.12;          // [vde_detected] (M1 slice 1)
+    double zdot_trip = 2.0;
+    int    vde_dwell_ticks = 20;
 };
+
+struct InnovCfg {                    // contracts/events.toml [innovation] (M1 slice 1)
+    long   window_ticks = 2500;      // aggregation_window_ms / dt
+    double sigma_token_vertical = 3.5;
+    double sigma_alarm_vertical = 5.0;  // single-window fire, no dwell (D-035)
+    int    dwell_windows = 2;
+    long   refractory_ticks = 10000; // refractory_ms / dt
+};
+InnovCfg load_innov(const std::string& events_toml_path);
 
 struct DispersionsCfg {              // contracts/dispersions.toml
     double ip_frac = 0.02, n_frac = 0.05, T_frac = 0.05, z0_mm = 3.0;
@@ -59,6 +71,10 @@ struct ScenarioCfg {                 // contracts/scenarios/<name>.toml
     double q_min = 1.0, hold_s = 10.0; int seed_count = 1000; double pass_frac = 0.90;
     // impurity puff event (fixed-mag override per D-032 schema note)
     bool   puff = false; double puff_mag = 0.003; double puff_t_lo = 8.0, puff_t_hi = 20.0;
+    // M1 slice 1: the vertical channel ([vertical] block; D-035 schema addition)
+    bool   vert_on = false;          // enable the linearized vertical model
+    bool   vs_on = true;             // VS feedback loop (false = open-loop = the enemy)
+    bool   vde_kick = false; double kick_mm = 25.0, kick_t_lo = 5.0, kick_t_hi = 5.0;
     uint32_t scenario_id = 0;        // fnv1a32 of name — part of the Philox counter
 };
 
@@ -69,6 +85,12 @@ struct GainsCfg {                    // control/gains_m0.toml (CEM output, commi
     double Krad = 0.9;                          // D-033: radiation feedforward — MW of
     // P_aux per MW of measured P_rad excess over its 5 s average (bolometric burn
     // control, standard practice; pure PID plateaued at ~83% on train seeds, receipted)
+    // M1 slice 1: the VS vertical loop (D-035)
+    double Kpz = 5.0e4, Kdz = 200.0;            // V per m / V per (m/s) — sweep-found:
+    // Kd through the 10 ms actuator lag destabilizes the screened mode above ~1e3
+    bool   vs_truth = false;                    // DEV-ONLY calibration switch: PD on true
+    // state instead of the EKF estimate. Never true in a committed scenario/gains file;
+    // the M1-full statecheck fence will make the shipping build unable to compile it.
 };
 
 struct ObjectiveCfg {                // contracts/objective.toml (M0-consumed subset)

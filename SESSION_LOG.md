@@ -243,3 +243,25 @@ M4's raw lanes.
 the enemy: Grad-Shafranov + passive conductors + γ-from-eigenproblem + diagnostics +
 statecheck fence + the EKF (NIS-gated) + §2.4 full + the lethal-legal class + the
 offline oracle. Gate: **F-SHAPE-1**.
+
+---
+
+## S7 · 2026-08-09 · M1 slice 1 — the enemy exists (partial-commit; same session)
+
+**Done (branch `m1-shape`; receipt `runs/m1s1-vertical-2026-08-09.md`; D-035):**
+core/vertical.h — the linearized vertical instability over the REAL passive-conductor
+circuit model (24 filaments, Maxwell mutuals via AGM elliptic integrals, 20-turn VS
+pair); **γ⁻¹ = 48.9 ms wall-set REPORTED from the eigenproblem** (4.16 ms shell-removed;
+class [10,100] pre-registered, PHY-03's report-not-configure law held); open-loop VDE
+dies with the full token chain (gate → TQ(vde) → CQ → disrupt); observer-in-the-loop PD
+null holds 20/20 through 60 mm kicks; the [innovation] lane is LIVE (two-tier
+self-calibrated gate — a contract change, receipted); ctest 6/6, tier-0 goldens intact.
+Three measured control lessons + the null's own limit cycle banked for F-NULL-C.
+
+**Honest state:** M1 is OPEN — slice 1 only. No GS, no transport, no model-based EKF
+(kinematic tracker stands in, maximal-handicap-documented), innovation gate v0 (11/20
+above-dance kicks), no oracle, F-SHAPE-1 not attempted. The enemy exists and is heard;
+the shape comes next.
+
+**Next:** continue `KICKOFF_M1.md` slice 2 (GS + current profile + transport + the
+model-based EKF + oracle → F-SHAPE-1), fresh session, branch stays `m1-shape`.

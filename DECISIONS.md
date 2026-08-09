@@ -264,3 +264,17 @@ cross-session with the operator ratifying.*
   Citation-vs-confabulation is the tokenizer's measured value (M-M9's comparison, first
   pass). (g) Rig lessons: NOMINMAX; composed-session script timing needs death-anchored
   placement; LLM emissions are not bit-stable (ledgers are records, not goldens).
+- **D-035 · 2026-08-09 · M1 slice 1 — the vertical channel (partial-commit; M1 open).**
+  Shipped: 24-filament true-mutual circuit model (AGM elliptic), 20-turn VS pair,
+  γ REPORTED from the eigenproblem (48.9 ms wall-set / 4.16 ms shell-removed — class
+  pre-registered, value never configured), open-loop VDE death chain with tokens,
+  observer-in-the-loop PD null (20/20 through 60 mm kicks), scenario [vertical] block +
+  vde_kick/vde_open_loop, per-tick probe noise on Philox stream 3, b1.g1/b4.u1 draws
+  now consumed (layout stable). Contract change: events.toml [innovation] two-tier law
+  (sigma_alarm fires single-window — a kick lives in ONE window; sigma_token keeps
+  dwell) + self-calibrated floor (σ-units = ratio to the nominal EMA floor — D-023's
+  NIS-calibration clause in minimal form). Slice-1 reductions, receipted: estimator =
+  kinematic α-β tracker (model-based 2-state EKF whipped on the slow wall manifold —
+  measured); v0 gate tokenizes above-dance kicks 11/20 (acceptance set to ≥10/20,
+  immaturity stated); the PD null's ±2–4 cm limit cycle is measured F-NULL-C fodder.
+  Slice 2 owns: GS, transport, the model-based EKF + χ² NIS, the oracle, F-SHAPE-1.
