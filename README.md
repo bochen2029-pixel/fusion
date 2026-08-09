@@ -21,3 +21,4 @@ the Booster Lander Simulator (the sim constitution), auricle/SYNCYTIUM (the resi
 membrane, measured), TinyVillage (the Deadline Law and tokenized experience).
 License: **MIT**. Note: `runs/` (measurement receipts) is local-only by design —
 snapshot-preserved, summarized in [`SESSION_LOG.md`](SESSION_LOG.md).
+Why this project exists — the ignition thesis: [`docs/WHY_FUSION.md`](docs/WHY_FUSION.md).

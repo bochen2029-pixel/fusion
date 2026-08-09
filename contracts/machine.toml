@@ -44,10 +44,14 @@ M_amu      = 2.5     # 50/50 D-T
 # Self-consistent P_loss (P = W/tau_E(P)):  P^0.31 = 22.6/7.19  =>  P_loss = 40 MW
 # Fusion power (flat-profile floor, Bosch-Hale <sv>(8 keV) = 5.2e-23 m^3/s):
 #   P_fus = (n^2/4)<sv> E_fus V = 2.25e40·5.2e-23·2.82e-12 J·19.6 = 65 MW ; P_alpha = 13 MW
-# => P_aux = 40 - 13 = 27 MW ; Q = 65/27 ≈ 2.3 at H98 = 1.0 (profile peaking is headroom,
-#    not claimed). Q > 1 requires H98 ≳ 0.85 at this point — the gate is PASSABLE and
-#    NOT TRIVIAL, which is what F-BURN-0 wants. Every number above is restated by code
-#    at runtime and receipted; this comment is the pre-registered expectation.
+# => P_aux = 40 - 13 = 27 MW ; Q = 65/27 ≈ 2.3 at H98 = 1.0 — RADIATION-FREE BOUND.
+# D-032 (M0 implementation, radiation-honest restatement — the code exposed the gap):
+#   convention pinned per PHY-09: tau_E(IPB98) covers CONDUCTION (P_cond^0.31 = W/(C·H98),
+#   closed form); radiation is a separate loss channel. With the baseline channels at the
+#   1e-4 Ar seed (brems ~5 + line ~1 + synchrotron ~2 MW): P_aux ≈ 33 MW, **Q ≈ 1.9–2.0
+#   at H98 = 1.0**; Q > 1 requires H98 ≳ 0.88. Still passable, still not trivial —
+#   F-BURN-0's premise stands, restated honestly. The physics_sanity ctest asserts the
+#   band [1.4, 2.8]; every number is restated by code at runtime and receipted.
 # β_N sanity: <p> = (2/3)W/V = 0.77 MPa → β = 1.34% → β_N = β·a·B/Ip = 1.08 (f_Troyon 0.39)
 # Greenwald: n_GW = Ip/(π a^2) = 8.33e20 → f_GW = 0.36 at reference. Margins everywhere.
 
@@ -90,10 +94,21 @@ ip_ramp_max_MA_per_s = 1.0    # compact high-field class (PHY-27: 0.15 was ITER-
                               # nominal scenario ramp 0.7 MA/s → ~12 s ramp phase
 n_ramp_max_e20_per_s = 0.15   # line-averaged n̄_e (the interferometer measurand)
 
+[heating]           # auxiliary actuator install (D-032 — the M0 build needed it pinned)
+P_aux_max_MW       = 60.0   # NBI+ECRH install; the reference point uses ~33, the puff
+                            # response transiently needs ~55 — headroom is the design
+tau_act_s          = 0.2    # first-order actuator lag (scattered per dispersions)
+slew_MW_per_s      = 40.0   # power slew capability
+S_gas_max_e20_per_s = 8.0   # fueling source cap [1e20 m^-3 s^-1]
+tau_gas_s          = 0.1
+
 [radiation]
 wall_reflectivity  = 0.8    # Trubnikov synchrotron free parameter (PHY-18) — matters at 12 T
 impurity_species   = "Ar"   # the line-radiation species (PHY-08): L_z(T) table, coronal fit
-impurity_seed_frac = 0.001  # n_imp/n_e baseline; puff scenarios raise it
+impurity_seed_frac = 1e-4   # n_imp/n_e baseline (D-032: was 0.001 — at 0.1% Ar the seed
+                            # alone radiates ~8 MW and Q@H98=1 drops to ~1.6; 1e-4 keeps
+                            # the reference honest at Q ≈ 1.9–2.0); puff scenarios inject
+                            # on top of this
 
 [alphas]
 E_alpha_MeV        = 3.52   # pinned (PHY-19: never 17.6 — that is E_fus)

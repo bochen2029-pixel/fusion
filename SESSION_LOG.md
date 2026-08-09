@@ -158,3 +158,45 @@ local-only by design (snapshot-preserved).
 
 **Honest state / next:** unchanged from S3 — still zero code; M0 next via
 `KICKOFF_M0.md`, then the M0.5 thesis slice before M1.
+
+---
+
+## S5 · 2026-08-09 · M0 — the burn (first product code; same session, continued)
+
+**Done — M0 complete, F-BURN-0 GREEN on attempt 1:**
+- **Code (branch `m0-burn`):** `core/` tier-0 burn per spec §2.1 on FUSOR-1 (Bosch-Hale
+  range-asserted, alpha lag, Brems + Ar line radiation + Trubnikov-shaped synchrotron,
+  Ohmic + volt-seconds, particle + He-ash balance + dilution, **implicit IPB98** with
+  the conduction convention, RK4 dt=100 µs, burn sub-cycle 10, quench per-tick,
+  Philox4x32-10 stream domains, §2.4 disruption triggers/TQ/CQ, spine quench_precursor
+  + SPINE_SHUTDOWN verdict class, M0 floors) · `control/` PID+rad-ff null ·
+  `fusor` + `fusor_mc` (Wilson CIs, JSON, golden dump, --verbose-fails) · ctests
+  `replay_oracle` / `physics_sanity` / `budget_events` / `golden_check` / `seedcheck` ·
+  `trainer/tune_pid.py` (CEM + playoff, seed guard) · tomlplusplus v3.4.0 vendored +
+  pinned (sha256 in `third_party/README.md`).
+- **Measured numbers (receipt `runs/m0-burn-2026-08-09.md`):** gate **985/1000 = 0.985,
+  Wilson95 [0.9754, 0.9909]** (required ≥0.90 / LB ≥0.88), 0 disruptions / 0 spine
+  shutdowns; every fail drew H98 < 0.91 (the capped tail); reference point Q = 2.213,
+  τ_E = 0.561 s (physics_sanity, inside D-032 bands); ctest **5/5**; goldens ×3
+  committed (fnv 6e537c65… / 145a1573… / 9d8d3e0d…); ~55 ms/run serial.
+- **Null result (DoD 3):** the PID IS the null at M0 — stated; CEM-tuned with a
+  receipted budget, ships as `control/gains_m0.toml`, becomes M2's in-binary arm.
+- **Measured control lessons (D-032h, D-033):** objective-without-gate-terms drove pass
+  to 0.00 (misaligned-objective, receipted); 48-seed batch selection is ±10% noisy →
+  playoff protocol; pure-PID plateau 83%; naive rad-ff HURTS (Q's own denominator);
+  the winning strategy is the hot pre-puff hold — the CEM zeroed Krad on its own.
+- **Docs:** D-032/D-033 appended; `docs/WHY_FUSION.md` (the ignition thesis, distilled
+  from the operator dialogue) + README pointer; KICKOFF_M05 written (DoD 5); ROADMAP M0
+  checked + current-kickoff pointer → M0.5. Two invalid-TOML fixes (objective, writs —
+  multi-line constructs; caught by the build — P-01's "which parser chokes" answered
+  empirically).
+- **Commit:** the `m0-burn` merge on `main` (this commit). Snapshot per DoD 6.
+
+**Honest state:** the plant burns, holds Q ≈ 2 through radiative disturbances under a
+tuned classical null, and replays bit-identically — **first measured milestone; no organ
+beats a null yet** (the PID IS the null), no membrane, no voice, and control reads true
+state until M1's statecheck fence. Every §7 number beyond M0's rows remains a target.
+
+**Next:** a fresh session opens **`KICKOFF_M05.md`** (branch `m05-thesis-slice`) — the
+thesis slice: tokenizer + floors + text-only triple + the three-arm harness +
+F-VERACITY's tape-grader, dry-run before the M1 physics grind (D-019).

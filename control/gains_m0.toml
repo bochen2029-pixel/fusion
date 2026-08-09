@@ -1,0 +1,11 @@
+# control/gains_m0.toml -- CEM-TUNED (trainer/tune_pid.py; receipt in runs/).
+# budget: iters=20 pop=24 elites=6 nseeds=48 rngseed=7; train-domain seeds only (< 800000).
+[pid]
+Kp = 2.127436
+Ki = 0.357922
+Kd = 1.566948
+Kpn = 1.023148
+Kin = 0.000000
+P_ff_MW = 47.549399
+S_ff_e20 = 1.217578
+Krad = 0.000000
