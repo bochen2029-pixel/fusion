@@ -41,6 +41,10 @@ add_executable(test_vertical tests/test_vertical.cpp)
 target_link_libraries(test_vertical PRIVATE fusion_core)
 add_test(NAME vertical_enemy COMMAND test_vertical ${CMAKE_SOURCE_DIR})
 
+add_executable(test_gs tests/test_gs.cpp)
+target_link_libraries(test_gs PRIVATE fusion_core)
+add_test(NAME gs_solver COMMAND test_gs ${CMAKE_SOURCE_DIR})
+
 # ---- M0.5: fusor_shadow — the thesis-slice triple (llama.cpp in-process, delay-loaded
 # from C:/llama.cpp at runtime; import libs vendored — auricle's proven pattern)
 set(LLAMA_TP ${CMAKE_SOURCE_DIR}/third_party/llama.cpp)

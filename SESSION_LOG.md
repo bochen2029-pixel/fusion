@@ -265,3 +265,20 @@ the shape comes next.
 
 **Next:** continue `KICKOFF_M1.md` slice 2 (GS + current profile + transport + the
 model-based EKF + oracle → F-SHAPE-1), fresh session, branch stays `m1-shape`.
+
+---
+
+## S8 · 2026-08-09 · M1 slice 2a — the GS solver core (partial-commit; same session)
+
+**Done (branch `m1-shape`; receipt `runs/m1s2a-gs-2026-08-09.md`; D-036):**
+`core/gs.h` — the Δ* solver, **analytic-verified to 4.0e-6** (Solov'ev, 65×65, fixed
+deterministic sweeps) + Picard equilibrium machinery (Ip renormalization → 8.50 MA
+exact; axis interior/midplane; li 0.22 under the rectangle-shell BC — the BC's inboard
+axis bias measured and stated). ctest 7/7. Slice-2b ownership pre-registered in D-036.
+
+**Honest state:** M1 remains OPEN. The tier-1 stack now has: the enemy (slice 1,
+γ-from-eigenproblem + VDE death chain + live innovation lane) and the shape's verified
+numerical heart (slice 2a). Missing: shaped/free boundary, q95, transport, model-based
+EKF, oracle, F-SHAPE-1 — slice 2b+, next session, same branch.
+
+**Next:** SESSION PAUSE by operator's request — handoff to be written jointly.

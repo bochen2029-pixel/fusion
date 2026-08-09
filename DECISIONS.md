@@ -278,3 +278,12 @@ cross-session with the operator ratifying.*
   measured); v0 gate tokenizes above-dance kicks 11/20 (acceptance set to ≥10/20,
   immaturity stated); the PD null's ±2–4 cm limit cycle is measured F-NULL-C fodder.
   Slice 2 owns: GS, transport, the model-based EKF + χ² NIS, the oracle, F-SHAPE-1.
+- **D-036 · 2026-08-09 · M1 slice 2a — the GS solver core (partial-commit; M1 open).**
+  Shipped: the Δ* elliptic solver (SOR, fixed sweeps, deterministic) **analytic-verified
+  to 4e-6** against the Solov'ev solution — the classic GS acceptance test — plus the
+  Picard loop with per-iteration Ip renormalization (hits 8.50 MA exactly) and the
+  li/β_p integral machinery. Pre-registered slice-2b ownership: shaped plasma boundary
+  (free-boundary coils + von Hagenow), X-point, q-profile/q95, the Shafranov-shift
+  direction claim (the rectangle-shell BC measurably biases the axis 134 mm inboard —
+  reported, not hidden), the DST/CR fast solver, transport coupling, the model-based
+  EKF, the oracle, F-SHAPE-1. The tier-1 build now has its verified numerical heart.
