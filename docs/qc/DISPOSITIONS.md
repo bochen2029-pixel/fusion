@@ -201,5 +201,7 @@ are to `FUSION_ARCHITECTURE_v0.2.md`; contracts by filename.
 | P-1..P-8 (premise) | NOTED/FIXED — P-1/P-2 → D-018+three arms; P-3 → F-VERACITY; P-4 → §0(c) + D-019 sequencing; P-5 → lethal-legal class; P-6 → EKF info set; P-7 → noted in D-019 rationale; P-8 → depths cut |
 | C-1..C-22 (comprehension) | FIXED — glossary completions in CLAUDE.md (tokamak + estate halves); remaining parent-repo deep-dives are named read-gates, not assumed knowledge |
 
-**Open operator questions:** tier-2 MHD ruling (D-020) · LICENSE (FE-25). Everything else
-is dispositioned above. — *v0.2 session, 2026-08-09*
+**Open operator questions: none.** Both were ruled by the operator on 2026-08-09
+(D-031): tier-2 MHD **cut for v1** (renderer = tier-1-derived emissivity + artistic
+noise; pure-renderer revisit post-M5) and LICENSE = **MIT**. Every finding from all six
+instruments is dispositioned. — *v0.2 session, 2026-08-09*

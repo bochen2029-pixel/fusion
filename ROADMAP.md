@@ -64,7 +64,7 @@ line (P-15's structural pointer).
       **F-KEEPUP-F + F-PRESENCE-F** scripted soak, and the 90-second video.
       **Exit:** the video + the published ledger, wins and losses both.
 
-**Parked (post-M5):** UE5 client on the same telemetry; tier-2 MHD (operator ruling
-pending — D-020; the sanctioned v1 compromise is tier-1-derived emissivity + artistic
-noise in the renderer); MCTS scenario planning + sysid-by-backprop (D-020, named nulls if
-revived); the emit-QLoRA for this domain; multi-reactor rooms.
+**Parked (post-M5):** UE5 client on the same telemetry; tier-2 MHD (cut for v1 — D-031;
+the renderer ships tier-1-derived emissivity + artistic noise; pure-renderer revisit
+only); MCTS scenario planning + sysid-by-backprop (D-020, named nulls if revived); the
+emit-QLoRA for this domain; multi-reactor rooms.

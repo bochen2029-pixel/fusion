@@ -138,11 +138,11 @@ BOTH SEAMS:             THE DEADLINE LAW — fixed budgets + aborts + drop-event
   bound in ΔZ triggers an event-driven early re-solve** (CTL's open question, answered: a
   VDE simulated on a stale linearization far outside its validity would be a fake
   disruption).
-- **Tier 2 — the spectacle (3-D resistive MHD, renderer-only).**
-  **[OPERATOR RULING PENDING — D-020.]** Recommended v1: **cut**; the renderer raymarches
-  a tier-1-derived emissivity field (n, T on the GS geometry) with artistic noise — the
-  beauty stays, the GPU consumer, VRAM row, and GB/s telemetry problem go. If ruled in:
-  64³ fp16, 10 Hz, and it **feeds the renderer, never the controller**.
+- **Tier 2 — the spectacle: CUT for v1 (operator ruled — D-031).** The renderer
+  raymarches a **tier-1-derived emissivity field** (n, T on the GS geometry) with
+  artistic noise — the beauty stays; the GPU consumer, the VRAM row, and the GB/s
+  telemetry problem go. Full 3-D resistive MHD stays parked post-M5 as a pure-renderer
+  revisit; if ever revived it **feeds the renderer, never the controller**.
 
 ### 2.2 The booster constitution, inherited verbatim (v0.2-hardened)
 
@@ -597,8 +597,9 @@ binds from M0**, and derived figures carry their arithmetic (D-018).
   **F-KEEPUP-F + F-PRESENCE-F** scripted soak, the 90-second video. *Gate:* the video +
   the published three-arm ledger, wins and losses both.
 
-**Parked (post-M5):** UE5; tier-2 MHD (per D-020's operator ruling); MCTS scenario
-planning + sysid (named nulls required); the emit-QLoRA; multi-reactor rooms.
+**Parked (post-M5):** UE5; tier-2 MHD (cut for v1 — D-031; pure-renderer revisit only);
+MCTS scenario planning + sysid (named nulls required); the emit-QLoRA; multi-reactor
+rooms.
 
 ---
 

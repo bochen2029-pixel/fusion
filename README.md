@@ -19,3 +19,5 @@ Core binary: `fusor`. Status: **spec v0.2, pre-build — M0 unsuspended.** Audit
 `docs/qc/` (five-lane swarm + fresh-eyes second instrument + `DISPOSITIONS.md`). Parents:
 the Booster Lander Simulator (the sim constitution), auricle/SYNCYTIUM (the resident
 membrane, measured), TinyVillage (the Deadline Law and tokenized experience).
+License: **MIT**. Note: `runs/` (measurement receipts) is local-only by design —
+snapshot-preserved, summarized in [`SESSION_LOG.md`](SESSION_LOG.md).

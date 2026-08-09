@@ -144,3 +144,17 @@ otherwise. Two questions await the operator: tier-2 MHD (D-020) and LICENSE.
 
 **Next:** a fresh session opens **`KICKOFF_M0.md`** (Step 0: branch `m0-burn`) and builds
 the burn. Then M0.5 — the thesis slice — before M1 (D-019).
+
+---
+
+## S4 · 2026-08-09 · operator rulings + publication (same session, continued)
+
+**Done:** the operator ruled both open questions — **tier-2 MHD cut for v1** (renderer =
+tier-1-derived emissivity + artistic noise; pure-renderer revisit post-M5) and
+**LICENSE = MIT** — logged as **D-031**; spec §2.1/§9, ROADMAP, DISPOSITIONS, README
+synced (zero open operator questions remain). Repo published **public** at
+`https://github.com/bochen2029-pixel/fusion` with description + topics; `runs/` stays
+local-only by design (snapshot-preserved).
+
+**Honest state / next:** unchanged from S3 — still zero code; M0 next via
+`KICKOFF_M0.md`, then the M0.5 thesis slice before M1.

@@ -195,3 +195,11 @@ cross-session with the operator ratifying.*
   v1 (id/rev/supersedes/ttl/cancel/schedule, typed units, formed_tick + rev_observed
   staleness gates, acceptance receipts, the session input-tape — FRESH-6). v1 ships A0
   unsolicited / A2 voice numeric setpoints / A3 envelope-tightening only.
+- **D-031 · 2026-08-09 · Operator rulings: tier-2 cut; MIT; public.** (a) **Tier-2 MHD
+  is CUT for v1** per the standing recommendation D-020 reserved: the renderer ships
+  tier-1-derived emissivity + artistic noise; full 3-D MHD is a post-M5 pure-renderer
+  revisit and, if ever revived, feeds the renderer never the controller. (b) **LICENSE =
+  MIT** (root LICENSE, Access Intellect LLC; FE-25 closed). (c) **The repo is public on
+  GitHub** (`github.com/bochen2029-pixel/fusion`); `runs/` stays local-only by design —
+  receipts are snapshot-preserved and summarized in SESSION_LOG. All open operator
+  questions from the v0.2 ledger are now closed.
