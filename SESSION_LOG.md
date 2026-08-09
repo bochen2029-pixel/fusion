@@ -200,3 +200,46 @@ state until M1's statecheck fence. Every §7 number beyond M0's rows remains a t
 **Next:** a fresh session opens **`KICKOFF_M05.md`** (branch `m05-thesis-slice`) — the
 thesis slice: tokenizer + floors + text-only triple + the three-arm harness +
 F-VERACITY's tape-grader, dry-run before the M1 physics grind (D-019).
+
+---
+
+## S6 · 2026-08-09 · M0.5 — the thesis slice (the mind meets the machine; same session, continued)
+
+**Done — M0.5 complete, dry-run only (no gate claims, per its charter):**
+- **Code (branch `m05-thesis-slice`):** `core/` event tap (POD EventRecs riding the
+  golden flag; goldens unaffected — 2/2 ctest green) · `membrane/feed` (POD→text
+  renderer per events.toml, tick synthesis, composer, truth-table writer, `--null`
+  ticks-only mode) · `membrane/tape.h` (hash-chained durable tape, verify green) ·
+  **`membrane/shadow.cpp` — `fusor_shadow`**: the Qwen3.5-9B triple on one 32k
+  `kv_unified` trunk (auricle soak machinery re-grown: fusion seats, structural
+  plant-lane boundaries M-B6, word-grain segmenter on `opt`, fork-stub Sentinel M-M2,
+  per-seat caps, 2 s budget drops, A0 log-only) with **three arms** (resident /
+  event-twin / poll-twin), F-VERACITY code grader, tape verify · llama.cpp import set
+  vendored + pinned (delay-load from C:/llama.cpp — auricle's proven pattern) ·
+  scenarios `shadow_demo`/`shadow_demo2` + the operator script + veracity battery
+  (`contracts/eval/`).
+- **Measured (receipt `runs/m05-thesis-slice-2026-08-09.md`; D-034):** event-twin
+  parity at **3.1× token cost** (D-018's narrowed claim, first data) · poll twin absent
+  (5/6 questions unanswered) · dial-zero would-fire **85%** (cross-domain
+  reproduction), guards contained to 36 emits · veracity: resident 5/6 code-graded ·
+  Skeptic caught the planted Q=4 falsehood *and* the accidental T-falsehood, citing the
+  stream · Sentinel fired on the floor-violating writ; its **gated would-fire (+1.47)
+  on the floor-legal-but-lethal writ is FRESH-3's first datum** · the tokenizer null
+  **confabulates** where events give citation (fast death invisible between ticks).
+- **Findings → forward:** solicited answers need their own cap lane (M4); the readback
+  format is what makes F-VERACITY mechanical (M4); the composed-session script wants
+  death-anchored timing (M3 rescope).
+- **Docs:** D-034 · KICKOFF_M1 written (DoD 5) · ROADMAP M0.5 checked, pointer → M1.
+- **Commit:** the `m05-thesis-slice` merge on `main` (this commit). Snapshot per DoD 6.
+
+**Honest state:** the reactor burns AND is watched — a resident triple that answers
+with the tape's numbers, contests falsehoods, and flags dangerous writs, all at dial
+zero behind guards, all log-only. Still: no EKF (innovation lane empty), no ghost (the
+stub IS the null), no voice, no pacing, emissions non-deterministic. The three-arm
+instrument is real and cheap to re-run; the claim's full test needs M1's physics and
+M4's raw lanes.
+
+**Next:** a fresh session opens **`KICKOFF_M1.md`** (branch `m1-shape`) — the shape and
+the enemy: Grad-Shafranov + passive conductors + γ-from-eigenproblem + diagnostics +
+statecheck fence + the EKF (NIS-gated) + §2.4 full + the lethal-legal class + the
+offline oracle. Gate: **F-SHAPE-1**.

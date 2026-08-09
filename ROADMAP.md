@@ -4,7 +4,7 @@ The next phase to build is the **first unchecked milestone**. A milestone is DON
 [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) — gate green with receipts, nulls reported,
 docs synced in the same commit. Spec: [FUSION_ARCHITECTURE_v0.2.md](FUSION_ARCHITECTURE_v0.2.md) §9.
 Decisions live in [DECISIONS.md](DECISIONS.md) (append-only).
-**Current kickoff: [`KICKOFF_M05.md`](KICKOFF_M05.md)** — the finishing session updates
+**Current kickoff: [`KICKOFF_M1.md`](KICKOFF_M1.md)** — the finishing session updates
 this line (P-15's structural pointer).
 
 - [x] **V0.2 — the QC-swarm revision (MANDATORY BEFORE M0; bootstrap: `KICKOFF_SPEC_V02.md`;
@@ -34,13 +34,17 @@ this line (P-15's structural pointer).
       **DONE 2026-08-09 — F-BURN-0 GREEN, attempt 1: pass 985/1000 = 0.985, Wilson95
       [0.975, 0.991] (required ≥0.90/LB 0.88); 0 disruptions, 0 spine shutdowns; ctest
       5/5. Receipt: `runs/m0-burn-2026-08-09.md`.**
-- [ ] **M0.5 — the thesis slice (shadow; D-019; scope pinned in v0.2).** Fusion's shadow
-      soak: tier-0 plant + the `events.toml` tokenizer + floors + the text-only triple —
-      no GS, no voice — so the three-arm F-PRESENCE-F harness and F-VERACITY's
-      tape-grader exist and dry-run on scripted events **before** the M1 physics grind.
-      **Exit:** shadow ledger + both nulls wired (tokenizer-vs-threshold-logger,
-      triple-vs-both-twins) + a dry-run report; no gate claims — the rig exists so the
-      bet meets evidence early. M3 rescopes onto this rig (tier-1 fidelity + live ghosts).
+- [x] **M0.5 — the thesis slice (shadow; D-019).** `fusor_shadow`: plant event tap →
+      tokenizer → hash-chained tape → the Qwen3.5-9B triple (fusion seats, structural
+      plant-lane boundaries, fork-stub Sentinel, caps + budget drops) → **three arms +
+      tokenizer null + F-VERACITY code grader**, dry-run on a composed 45-min session
+      (one survival, two deaths on tape).
+      **DONE 2026-08-09 — no gate claims, first data everywhere: event-twin parity at
+      3.1× cost (D-018 measured); poll twin absent 5/6 answers; dial-zero would-fire
+      85% (guards contained to 36); Skeptic caught the planted falsehood citing the
+      record; Sentinel's gated would-fire on the floor-legal writ = FRESH-3's datum;
+      the tokenizer null confabulates where events give citation. D-034; receipt
+      `runs/m05-thesis-slice-2026-08-09.md`. M3 rescopes onto this rig.**
 - [ ] **M1 — the shape and the enemy.** Tier-1: free-boundary Grad-Shafranov (100–200 Hz)
       + 10 kHz linearized vertical model (D-003) + PF coil circuits + synthetic diagnostics
       + EKF innovation source (D-006) + 1-D transport + scenario set. MPPI oracle (CEM)
