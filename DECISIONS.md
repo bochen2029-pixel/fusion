@@ -76,3 +76,41 @@
   explicitly re-registered as a risk). KICKOFF_M0 will be rewritten at that point
   (REPO's three cold-session blockers land there: TOML parser choice + third_party plan,
   the scenario schema template, the exact build-command block).
+
+*The following arise from the fresh-eyes second-instrument pass (`docs/qc/FRESH_EYES.md`
++ its Addendum §5, 2026-08-09) and the founding session's recorded response, adjudicated
+cross-session with the operator ratifying.*
+
+- **D-018 · 2026-08-09 · The claim gets its instruments (fresh-eyes mandate).** (a) The
+  anti-turn claim is NARROWED, precisely: on pre-tokenized lanes the tokenizer is itself
+  a threshold-waker, so residency's plant-side value is hot-memory integration across
+  events, not wake timing; the full anti-turn claim lives where the stream is raw (human
+  lanes, partials) — "the anti-turn advantage lives exactly where the world hasn't
+  already been compressed for you." F-PRESENCE-F therefore runs THREE arms — resident /
+  event-triggered turn-based twin / polling twin — each arm's information set
+  pre-registered; what only residency buys once events are granted to the twin is the
+  claim under test. (b) **F-VERACITY** is a new pre-registered falsifier: planted factual
+  questions + a citation-fidelity audit graded BY CODE against the tape (L5-clean),
+  gating M4's solicited ship — a Speaker that fabricates rev citations must be able to
+  lose. (c) The ghost's demo story is **"causal via the sovereign"**: its value separates
+  from the governor only on a pre-registered floor-legal-but-lethal scenario class, which
+  F-PRESENCE-F's planted errors must draw from — the receipt shows the governor alone
+  would not have saved it. (d) Citation rule: derived figures carry their arithmetic
+  (the emit rate is "2,823 / 3h03m51s = 921/hr, run C"), inherited figures their receipt
+  path. Standing QC pattern, banked: **swarm-then-stranger, freeze-before-the-seal** —
+  the swarm audits the machine, the stranger audits the claim.
+- **D-019 · 2026-08-09 · The thesis slice comes first (sequencing inversion).** New
+  milestone **M0.5**: tier-0 plant + tokenizer + floors + the text-only triple — no GS,
+  no voice — fusion's shadow soak, so the three-arm harness and the tape-grader exist and
+  dry-run on scripted events by ~session 10 instead of ~session 25. The novel claim meets
+  evidence early; the physics ladder serves the bet, not the reverse. Scope pinned in
+  v0.2; M3 rescopes onto the same rig (tier-1 fidelity + live ghosts).
+- **D-020 · 2026-08-09 · v1 scope rulings.** MPC null: downgraded — PID+LQ is THE null; a
+  textbook MPC becomes a later, separately-receipted comparison (CTL-28). MCTS +
+  sysid-by-backprop: out of §3, parked post-M5 with named nulls or deleted (CTL-30/31).
+  Depths tier: cut from the v1 stack — returns only with a consumer, a budget row, and a
+  gate (supersedes D-001's four-tier enumeration for v1; the stack ships as three tiers).
+  Every spec range collapses to its cheap end for v1. **Tier-2 MHD: reserved to the
+  operator** — recommended cut for v1, sanctioned compromise = renderer raymarches
+  tier-1-derived emissivity + artistic noise; the ruling lands as its own D-entry in
+  v0.2 either way.

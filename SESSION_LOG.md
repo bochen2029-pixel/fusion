@@ -62,3 +62,43 @@ numbers, and the fastest finding was positive (sherpa already runs Nemotron 3.5)
 **Next:** a fresh session opens with `KICKOFF_SPEC_V02.md`, produces
 `FUSION_ARCHITECTURE_v0.2.md` + machine.toml + the redesign set, re-runs REPO's
 cold-session simulation, rewrites KICKOFF_M0 — then M0 unsuspends.
+
+---
+
+## S2 · 2026-08-09 · fresh-eyes second instrument + cross-session adjudication (no product code)
+
+**Done:**
+- Zero-context outsider deep scan per `KICKOFF_FRESH_EYES.md` (three passes; Pass-1
+  frozen to scratchpad **before** `docs/qc/` was unsealed). Deliverable:
+  `docs/qc/FRESH_EYES.md` — 8 premise doubts · 22 comprehension failures · 27 flaws →
+  **10 missed-by-all-five (2 gate-class: the three-arm twin, F-VERACITY), ~25
+  missed-by-me, 4 disagreements**; 8 auricle receipts re-verified (921/hr re-derived
+  exactly: 2,823 / 3h03m51s, run C); sherpa/Nemotron support web-verified (V-04 holds).
+  No fabricated numbers — the third instrument concurs with the swarm.
+- The founding session (low context) read the report and responded; the operator relayed
+  both ways and ratified. Adjudication recorded in FRESH_EYES **Addendum §5**: the
+  founding session conceded D1/D3/FRESH-5 and F-VERACITY outright; this session conceded
+  the Q1 steelman overreach (the ghost is causal **via the sovereign** on the
+  lethal-legal class — the writ doctrine working, not theater); tier-2's cut demoted to
+  an operator ruling with a sanctioned compromise. One caution back on the record:
+  auricle's existing F-PRESENCE null is a timer-twin, so the event-triggered arm is an
+  addition there too, not a relabel.
+- **Folded into the mandate (this commit):** `KICKOFF_SPEC_V02.md` de-trapped and
+  expanded (synthetic FUSOR-1 replaces "SPARC/DIII-D-class"; 2–4-session honesty +
+  machine-first ordering; deliverables 13–15: the eight orphaned dispositions with the
+  M2 ladder first, scope rulings, ripple sweep + citation hygiene; three-arm
+  F-PRESENCE-F + F-VERACITY + session input-tape + floor-legal-but-lethal class into
+  deliverables 4/5/6; tie-break protocol). ROADMAP: V0.2 bullet updated; **M0.5 "the
+  thesis slice" inserted before M1** (D-019); M2 null = PID+LQ (D-020). DECISIONS:
+  **D-018 / D-019 / D-020** appended. `KICKOFF_FRESH_EYES.md` committed as the
+  instrument's mandate.
+
+**Honest state:** still zero code. The spec's numbers are now verified-honest three ways
+(swarm, stranger, receipts); the machine-audit and the claim-audit are folded into one
+v0.2 worklist. The claim as staked is falsifiable-on-paper; nothing is falsified until
+rigs exist.
+
+**Next:** a fresh session opens `KICKOFF_SPEC_V02.md` (now scoped as 2–4 sessions,
+machine.toml first), produces v0.2 + `docs/qc/DISPOSITIONS.md` (dispositioning the five
+lanes AND FRESH_EYES), re-runs the cold-session simulation, rewrites KICKOFF_M0 — then
+M0, then the M0.5 thesis slice before M1.
