@@ -21,6 +21,11 @@ style             = "quadratic-hinge"     # floor; the objective discourages loi
 onset_frac        = 0.9     # barrier turns on at 90% of the floor margin
 weight            = 20.0
 
+[gate]              # D-032(h): the objective must price what the falsifier measures —
+# the first CEM run minimized q_rms and sacrificed the Q-hold (pass -> 0.00); receipted.
+miss_cost              = 500.0    # survived but failed the pre-registered hold criterion
+minq_shortfall_weight  = 2000.0   # per (q_min - minQ_window)^2, GOOD runs only
+
 [terminal]          # episode termination classes and their costs (MC verdict taxonomy)
 # CTL-10: spine-triggered shutdown IS a failure class — a controller rescued by the
 # plant's own safety gates has failed, and both F-NULL-C arms count it that way.
@@ -42,5 +47,4 @@ crn               = true    # common random numbers: all F-NULL-C arms run the S
 [stats]             # the statistics falsifiers use (CTL-08(5))
 rate_ci           = "wilson95"           # for GOOD/DISRUPT/SPINE_SHUTDOWN rates
 rms_test          = "paired-bootstrap-bca-95"  # Wilson cannot apply to RMS
-decision_rule     = "lexicographic: (1) disrupt+spine rate lower-CI must not worsen;
-                     (2) then tracking RMS must improve; split outcomes = the null wins"
+decision_rule     = "lexicographic: (1) disrupt+spine rate lower-CI must not worsen; (2) then tracking RMS must improve; split outcomes = the null wins"

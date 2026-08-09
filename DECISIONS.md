@@ -203,3 +203,40 @@ cross-session with the operator ratifying.*
   GitHub** (`github.com/bochen2029-pixel/fusion`); `runs/` stays local-only by design —
   receipts are snapshot-preserved and summarized in SESSION_LOG. All open operator
   questions from the v0.2 ledger are now closed.
+- **D-032 · 2026-08-09 · M0 implementation rulings (the code exposed them; receipted in
+  `runs/m0-burn-2026-08-09.md`).** (a) **Radiation-honest reference point:** machine.toml's
+  Q ≈ 2.3 was a radiation-free bound; with the PHY-09 convention pinned (IPB98 τ_E covers
+  CONDUCTION, closed-form P_cond^0.31 = W/(C·H98); radiation is a separate channel) and
+  the baseline channels on, the reference is **Q ≈ 1.9–2.2 at H98 = 1.0, Q > 1 needs
+  H98 ≳ 0.88** — machine.toml comment restated, physics_sanity ctest asserts the band.
+  (b) `impurity_seed_frac` 0.001 → **1e-4** (0.1% Ar radiates ~8 MW and drags Q to ~1.6).
+  (c) machine.toml gains a **[heating] block** (P_aux_max 60 MW, τ_act 0.2 s, slew
+  40 MW/s, gas caps) — the puff response needs ~55 MW transiently. (d) **Scenario-schema
+  additions:** a `[control]` block (setpoints + reporting reference) and per-event
+  `{mag, t_lo, t_hi}` overrides; `_TEMPLATE` gains them at next touch. (e) Small pinned
+  constants: Ar effective charge 16 with a +0.5 Z_eff pedestal (calibrated to machine
+  Zeff at reference); scaling-grade Ar L_z 8-point log-log table (Mavrin-2018-flavored)
+  and a Trubnikov-shaped synchrotron fit calibrated to ~2 MW at reference — both labeled
+  scaling-grade in code; Q reporting floor P_aux ≥ 0.5 MW; alpha lag τ_s = 0.053·T^1.5/n₂₀.
+  (f) **Gate-attempt protocol:** easy.toml frozen before any tuning; CEM tunes on
+  train-domain seeds only (guard + seedcheck); the gate seeds run ONCE per attempt and
+  every attempt is receipted with its count. (g) Philox draw layout (blocks 0–4) is
+  pinned in core/sim.cpp; layout changes = a D-entry. (h) **The objective prices the
+  gate:** the first CEM run minimized q_rms and drove the pass rate to 0.00 — a measured
+  misaligned-objective result, receipted; `objective.toml` gains a `[gate]` block
+  (miss_cost + minQ-shortfall weight) so the tuner optimizes what F-BURN-0 measures.
+  Gate seeds remained untouched throughout.
+- **D-033 · 2026-08-09 · The M0 null's structure, and two measured control lessons.**
+  The null is **PID (T-loop + n-loop) + an optional bolometric radiation feedforward**
+  (Krad · max(0, P_rad − 5 s EMA) — standard burn-control practice), all gains CEM-owned.
+  Measured en route (receipted in runs/m0-burn): (a) the pure PID plateaus at **~83%**
+  pass on train holdout — batch-luck selection was first masked as 90% until the playoff
+  protocol (re-score all-time finalists on one 400-seed fresh batch) exposed it;
+  (b) a hand-set Krad = 0.9 made things WORSE (82.8% → 76.8%): since the gate metric is
+  Q = P_fus/P_aux, countering a radiation loss with instant aux power crashes the
+  metric's own denominator — the winning strategy is a **hot pre-puff hold** (P_fus
+  cushion via feedforward offset, near-zero Ki) plus a *moderate* response, which is
+  exactly what CEM had converged to unaided. Krad's search floor is 0 so the optimizer
+  may discard it. The controller's job here is not "fight the disturbance" but "carry
+  enough margin that the fight stays cheap" — worth remembering at M2, where F-NULL-C's
+  net will face the same trade.

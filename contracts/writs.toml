@@ -53,9 +53,8 @@ fields    = { param = "enum(setpoint.params)", segments = "array of {t_s, value,
 autonomy  = "A2"
 staleness_window_s = 10.0
 
-[priority]
-fields    = { ordering = "enum(divertor_over_Q | Q_over_divertor | survival_over_all)",
-              horizon_s = "float" }   # enumerated (CTL-23a), advisory to the planner
+[priority]  # ordering enumerated (CTL-23a), advisory to the planner
+fields    = { ordering = "enum(divertor_over_Q|Q_over_divertor|survival_over_all)", horizon_s = "float" }
 autonomy  = "A0"
 staleness_window_s = 60.0
 

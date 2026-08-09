@@ -4,8 +4,8 @@ The next phase to build is the **first unchecked milestone**. A milestone is DON
 [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) — gate green with receipts, nulls reported,
 docs synced in the same commit. Spec: [FUSION_ARCHITECTURE_v0.2.md](FUSION_ARCHITECTURE_v0.2.md) §9.
 Decisions live in [DECISIONS.md](DECISIONS.md) (append-only).
-**Current kickoff: [`KICKOFF_M0.md`](KICKOFF_M0.md)** — the finishing session updates this
-line (P-15's structural pointer).
+**Current kickoff: [`KICKOFF_M05.md`](KICKOFF_M05.md)** — the finishing session updates
+this line (P-15's structural pointer).
 
 - [x] **V0.2 — the QC-swarm revision (MANDATORY BEFORE M0; bootstrap: `KICKOFF_SPEC_V02.md`;
       scoped 2–4 sessions, machine.toml first).** Disposition all 39 blockers + 60 majors
@@ -27,11 +27,13 @@ line (P-15's structural pointer).
       rewritten (TOML parser + third_party plan + build block). **Exit:** spec bumped to
       `FUSION_ARCHITECTURE_v0.2.md` (v0.1 kept beside), every blocker — five lanes AND
       FRESH_EYES — traceably dispositioned, REPO's cold-session simulation re-run clean.
-- [ ] **M0 — the burn.** Tier-0 0-D burn physics (Bosch-Hale, alpha heating, Bremsstrahlung
-      + synchrotron, IPB98(y,2) τ_E, live Q) + PID null + `fusor_mc` headless Monte-Carlo
-      (Wilson CIs) + memcmp replay oracle + minimal three.js dashboard (stretch).
-      **Exit:** replay bit-identical across two runs (memcmp green); PID sustains Q > 1 on
-      the easy scenario; MC prints rates + CIs. Receipts: `runs/m0-*`.
+- [x] **M0 — the burn.** Tier-0 0-D burn physics (Bosch-Hale, alpha heating, Bremsstrahlung
+      + synchrotron + line radiation + Ohmic + particle/ash balance, implicit IPB98(y,2),
+      live Q) + CEM-tuned PID null + `fusor_mc` headless Monte-Carlo (Wilson CIs) +
+      memcmp replay oracle + committed goldens.
+      **DONE 2026-08-09 — F-BURN-0 GREEN, attempt 1: pass 985/1000 = 0.985, Wilson95
+      [0.975, 0.991] (required ≥0.90/LB 0.88); 0 disruptions, 0 spine shutdowns; ctest
+      5/5. Receipt: `runs/m0-burn-2026-08-09.md`.**
 - [ ] **M0.5 — the thesis slice (shadow; D-019; scope pinned in v0.2).** Fusion's shadow
       soak: tier-0 plant + the `events.toml` tokenizer + floors + the text-only triple —
       no GS, no voice — so the three-arm F-PRESENCE-F harness and F-VERACITY's

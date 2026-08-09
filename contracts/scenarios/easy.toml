@@ -1,0 +1,40 @@
+# contracts/scenarios/easy.toml — THE M0 gate scenario (F-BURN-0). Pre-registered
+# 2026-08-09, BEFORE any tuning run (protocol in runs/m0-burn receipt). Conforms to
+# _TEMPLATE; the [control] block and per-event {mag,t_lo,t_hi} overrides are the D-032
+# schema additions (documented there).
+
+[meta]
+name         = "easy"
+class        = "gate"
+description  = "flat-top burn hold through one pre-registered impurity puff"
+activates_at = "M0"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 30.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]     # the null's setpoints + the reporting reference (D-032 schema addition)
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[disturbances]
+# One argon puff, fixed magnitude (delta n_imp/n_e), timing uniform in [t_lo, t_hi] —
+# drawn from the plant Philox stream, block 4 (draw layout in core/sim.cpp).
+events = [ { type = "impurity_puff", mag = 0.003, t_lo = 8.0, t_hi = 20.0 } ]
+
+[pass]        # F-BURN-0's numbers (spec v0.2 §8)
+metric       = "Q_sustained"
+q_min        = 1.0
+hold_s       = 10.0     # min Q over [t_puff, t_puff+10 s] must stay >= q_min
+seed_count   = 1000
+pass_frac    = 0.90     # Wilson95 lower bound must clear pass_frac - 0.02 = 0.88
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"   # initial_jitter + plant_scatter (H98 blind) per dispersions.toml
