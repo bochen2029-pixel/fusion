@@ -1,0 +1,37 @@
+# shadow_demo2 — M0.5 feed segment C: the density-limit death, full terminal chain.
+# Starts above 1.05 x Greenwald -> thermal quench -> current quench -> disrupt: the
+# complete [plant] terminal vocabulary lands on the tape. Demo class only.
+
+[meta]
+name         = "shadow_demo2"
+class        = "demo"
+description  = "born past the Greenwald boundary; TQ -> CQ -> disrupt on tape"
+activates_at = "M0.5"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 10.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 8.9
+T_keV        = 6.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[disturbances]
+events = []
+
+[pass]
+metric       = "survival"
+q_min        = 0.0
+hold_s       = 0.0
+seed_count   = 1
+pass_frac    = 0.0
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"

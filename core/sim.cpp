@@ -81,6 +81,12 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     const double hold_hi = hold_lo + sc.hold_s;
     double minQ = 1e30, q_se = 0.0, eff = 0.0; uint64_t q_n = 0, eff_n = 0;
     bool terminated = false;
+    // event tap state (records POD only; membrane renders text post-run — M-M11)
+    uint64_t sat_since = ~0ull; bool sat_reported = false;
+    auto ev = [&](uint64_t tk, EvKind k, uint32_t a, double v0, double v1) {
+        if (record) r.events.push_back(EventRec{ tk, k, a, v0, v1 });
+    };
+    ev(0, EvKind::PhaseStart, 0, sc.Ip_MA, 0.0);
 
     for (uint64_t tick = 0; tick <= n_ticks; ++tick) {
         const double t = double(tick) * DT_TICK;
@@ -149,18 +155,34 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             const bool halved = d.T < in.g.t_drop_frac * T_2ms_ago;
             if (d.frad > in.g.frad_trip || halved) frad_dwell += SUBCYCLE; else frad_dwell = 0;
             if (frad_dwell >= in.g.qp_dwell_ticks) {
+                ev(tick, EvKind::GateFire, 0, d.frad, d.T);
+                ev(tick, EvKind::SpineShutdown, 0, d.frad, 0.0);
                 r.verdict = Verdict::SPINE_SHUTDOWN; terminated = true;       // CTL-10:
                 r.t_end = t; break;                                           // a FAILURE
             }
             // radiative collapse -> thermal quench
             if (d.T < 0.5) { mode = TQ; W_preTQ = s.W;
                 W_postTQ = 3.0 * s.ne * m.V * m.T_postTQ_keV * E_KEV_J;
-                tq_ticks_left = int(m.tauTQ_ms * 1e-3 / DT_TICK + 0.5); }
+                tq_ticks_left = int(m.tauTQ_ms * 1e-3 / DT_TICK + 0.5);
+                ev(tick, EvKind::TerminalTQ, 0, d.T, d.frad); }
+            // ctrl saturation event (events.toml [controller].saturation_min_s)
+            const bool at_cap = s.Paux >= 0.999 * Pmax;
+            if (at_cap && sat_since == ~0ull) { sat_since = tick; sat_reported = false; }
+            if (!at_cap && sat_since != ~0ull) {
+                if (sat_reported)
+                    ev(tick, EvKind::CtrlSatOff, 0, double(tick - sat_since) * DT_TICK, 0.0);
+                sat_since = ~0ull;
+            }
+            if (at_cap && !sat_reported && double(tick - sat_since) * DT_TICK >= 0.5) {
+                sat_reported = true;
+                ev(tick, EvKind::CtrlSatOn, 0, s.Paux / 1e6, 0.0);
+            }
             // density limit
             if (s.ne > 1.05 * m.nGW_e20 * 1e20) nGW_dwell += SUBCYCLE; else nGW_dwell = 0;
             if (nGW_dwell >= 100 && mode == RUN) { mode = TQ; W_preTQ = s.W;
                 W_postTQ = 3.0 * s.ne * m.V * m.T_postTQ_keV * E_KEV_J;
-                tq_ticks_left = int(m.tauTQ_ms * 1e-3 / DT_TICK + 0.5); }
+                tq_ticks_left = int(m.tauTQ_ms * 1e-3 / DT_TICK + 0.5);
+                ev(tick, EvKind::TerminalTQ, 1, d.T, s.ne / (m.nGW_e20 * 1e20)); }
         }
         Thist[th_i] = d.T; th_i = (th_i + 1) % 20;
 
@@ -173,10 +195,13 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
                 const double eta_q = 2.0 * 2.8e-8 * Zeff_q / std::pow(m.T_postTQ_keV, 1.5);
                 const double Rp_q = eta_q * 2.0 * m.R0 / (m.a * m.a * m.kappa_a);
                 tauCQ = std::max(m.Lp_uH * 1e-6 / Rp_q, m.tauCQ_floor_ms * 1e-3);
+                ev(tick, EvKind::TerminalCQ, 0, tauCQ * 1e3, s.Ip / 1e6);
             }
         } else if (mode == CQ) {   // current quench: exponential Ip decay, per-tick
             s.Ip *= std::exp(-DT_TICK / tauCQ);
-            if (s.Ip < 0.5e6) { r.verdict = Verdict::DISRUPT; terminated = true; r.t_end = t; break; }
+            if (s.Ip < 0.5e6) {
+                ev(tick, EvKind::TerminalDisrupt, 0, t, s.Ip / 1e6);
+                r.verdict = Verdict::DISRUPT; terminated = true; r.t_end = t; break; }
         }
 
         // ---- scoring taps ----

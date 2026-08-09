@@ -240,3 +240,27 @@ cross-session with the operator ratifying.*
   may discard it. The controller's job here is not "fight the disturbance" but "carry
   enough margin that the fight stays cheap" — worth remembering at M2, where F-NULL-C's
   net will face the same trade.
+- **D-034 · 2026-08-09 · M0.5 measured findings (the thesis slice's first data;
+  receipt `runs/m05-thesis-slice-2026-08-09.md`).** (a) **Three-arm first light:** on
+  pre-tokenized lanes the event-triggered twin matches the resident's behavior (same 36
+  emissions, same per-seat split) at **3.1× the token cost** (27,772 vs 8,914) — D-018's
+  narrowed claim measured; the polling twin is structurally absent (8/36 judgment
+  points, 5/6 questions unanswered). Residency's plant-side value at this milestone =
+  cost + operator-lane grain; the raw-lane separation waits for voice, as staked.
+  (b) **Dial-zero over-fire reproduces on fusion:** 85% would-fire (92/108) — the
+  estate's inherited disposition problem, now cross-domain; the room guards contained
+  it (caps −36, fork-stub −20 → 36 actual). (c) **The caps do not distinguish solicited
+  answers from unsolicited initiative** — a direct operator question went unanswered
+  because the Speaker had hit its hourly cap; M4's solicited lane gets its own budget
+  (D-007's split, mechanically confirmed). (d) **F-VERACITY v0's code-vs-substance
+  divergence** (event twin: 2/6 by parser, ≈5/6 by human read — "ten point zero keV")
+  proves the M4 readback/answer-format convention is what makes truth mechanically
+  checkable, not an optional nicety. (e) **The FRESH-3 datum exists:** on the
+  floor-legal-but-lethal-class writ the Sentinel's judgment fired (+1.47) and the
+  static floors-stub gated it — the mind saw what the limit table cannot; the ledgered
+  would-fire is the M3 ghost-vs-null comparison's seed. (f) **The tokenizer null
+  confabulates:** ticks-only, the fast death vanishes entirely (zero lines) and the
+  mind narrates a 7% wobble as "violently collapsing" — with events it cites receipts.
+  Citation-vs-confabulation is the tokenizer's measured value (M-M9's comparison, first
+  pass). (g) Rig lessons: NOMINMAX; composed-session script timing needs death-anchored
+  placement; LLM emissions are not bit-stable (ledgers are records, not goldens).

@@ -1,0 +1,38 @@
+# shadow_demo — M0.5 feed segment B: the puff the controller cannot hold.
+# A 4x-lethal argon puff drives f_rad past 1.0; the spine's quench_precursor gate fires
+# (dwell 5 ms) and the run terminates SPINE_SHUTDOWN — the gate + shutdown receipts land
+# on the tape as [sys] lines. Demo class: never used for gates or tuning.
+
+[meta]
+name         = "shadow_demo"
+class        = "demo"
+description  = "flat-top killed by a 1.2% Ar puff; spine gate fires; shutdown on tape"
+activates_at = "M0.5"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 20.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[disturbances]
+events = [ { type = "impurity_puff", mag = 0.012, t_lo = 8.0, t_hi = 8.0 } ]
+
+[pass]        # demo scenarios carry the schema but claim nothing
+metric       = "survival"
+q_min        = 0.0
+hold_s       = 0.0
+seed_count   = 1
+pass_frac    = 0.0
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"

@@ -37,6 +37,23 @@ add_executable(test_golden tests/test_golden.cpp)
 target_link_libraries(test_golden PRIVATE fusion_core)
 add_test(NAME golden_check COMMAND test_golden ${CMAKE_SOURCE_DIR})
 
+# ---- M0.5: fusor_shadow — the thesis-slice triple (llama.cpp in-process, delay-loaded
+# from C:/llama.cpp at runtime; import libs vendored — auricle's proven pattern)
+set(LLAMA_TP ${CMAKE_SOURCE_DIR}/third_party/llama.cpp)
+if(EXISTS ${LLAMA_TP}/lib/llama.lib)
+  message(STATUS "fusion: llama.cpp import libs found — fusor_shadow enabled")
+  add_executable(fusor_shadow membrane/shadow.cpp membrane/feed.cpp)
+  target_include_directories(fusor_shadow PRIVATE ${LLAMA_TP}/include)
+  target_compile_definitions(fusor_shadow PRIVATE "FUSION_LLAMA_DIR=\"C:/llama.cpp\"")
+  target_link_libraries(fusor_shadow PRIVATE fusion_core
+    ${LLAMA_TP}/lib/llama.lib ${LLAMA_TP}/lib/ggml.lib ${LLAMA_TP}/lib/ggml-base.lib
+    delayimp)
+  target_link_options(fusor_shadow PRIVATE
+    /DELAYLOAD:llama.dll /DELAYLOAD:ggml.dll /DELAYLOAD:ggml-base.dll)
+else()
+  message(STATUS "fusion: llama.cpp import libs absent — fusor_shadow skipped")
+endif()
+
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
   # seedcheck: the trainer's gate-seed guard must refuse eval/gate domains (CTL-12)

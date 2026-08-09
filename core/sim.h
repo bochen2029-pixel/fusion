@@ -15,6 +15,14 @@ struct GoldenRec {          // fixed-size POD, every 100 ticks (10 ms) — the g
     double W, ne, nHe, nimp, T, Q, Paux, Ip;
     uint32_t mode, pad;
 };
+
+// The event tap (M0.5): fixed-size POD events the plant emits; membrane/ renders text
+// AFTER the run (M-M11: no text exists plant-side). Kinds mirror events.toml vocabulary.
+enum class EvKind : uint32_t {
+    PhaseStart = 0, CtrlSatOn = 1, CtrlSatOff = 2, GateFire = 3,
+    TerminalTQ = 4, TerminalCQ = 5, TerminalDisrupt = 6, SpineShutdown = 7,
+};
+struct EventRec { uint64_t tick; EvKind kind; uint32_t arg; double v0, v1; };
 #pragma pack(pop)
 
 struct RunResult {
@@ -27,6 +35,7 @@ struct RunResult {
     double H98_drawn = 1.0;
     uint64_t fnv = 0;               // FNV-1a64 over the golden byte stream
     std::vector<GoldenRec> golden;  // filled when record=true
+    std::vector<EventRec> events;   // filled when record=true (the tap rides the golden flag)
 };
 
 struct SimInputs {
