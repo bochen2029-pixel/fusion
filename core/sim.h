@@ -21,6 +21,7 @@ struct GoldenRec {          // fixed-size POD, every 100 ticks (10 ms) — the g
 enum class EvKind : uint32_t {
     PhaseStart = 0, CtrlSatOn = 1, CtrlSatOff = 2, GateFire = 3,
     TerminalTQ = 4, TerminalCQ = 5, TerminalDisrupt = 6, SpineShutdown = 7,
+    Innov = 8,          // [plant] innov mag=Xs cluster=vertical (M1 slice 1)
 };
 struct EventRec { uint64_t tick; EvKind kind; uint32_t arg; double v0, v1; };
 #pragma pack(pop)
@@ -33,6 +34,11 @@ struct RunResult {
     double effort = 0.0;            // mean (Paux/Pmax)^2 (objective actuator term)
     double t_end = 0.0, t_puff = -1.0;
     double H98_drawn = 1.0;
+    // M1 slice 1 (vertical channel; zeros when [vertical] is off)
+    double gamma_wall = 0.0, gamma_open = 0.0;   // REPORTED eigen growth rates [1/s]
+    double z_max_m = 0.0;                         // max |Z| over the run
+    double nis_mean = 0.0;                        // EKF consistency statistic
+    long   innov_events = 0;
     uint64_t fnv = 0;               // FNV-1a64 over the golden byte stream
     std::vector<GoldenRec> golden;  // filled when record=true
     std::vector<EventRec> events;   // filled when record=true (the tap rides the golden flag)
@@ -40,6 +46,7 @@ struct RunResult {
 
 struct SimInputs {
     MachineCfg m; FloorsCfg f; GatesCfg g; DispersionsCfg d; ScenarioCfg s; GainsCfg k;
+    InnovCfg ic;                    // events.toml [innovation] (M1 slice 1)
 };
 
 RunResult run_sim(const SimInputs& in, uint64_t seed, bool record);

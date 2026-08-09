@@ -27,14 +27,24 @@ std::vector<FeedLine> render_feed(const RunResult& r, double scale, long long t0
             case EvKind::CtrlSatOff:
                 L.lane = "plant"; L.text = fmt("ctrl sat released after %.1fs", e.v0); break;
             case EvKind::GateFire:
-                L.lane = "sys"; L.text = fmt("gate quench_precursor fired f_rad=%.2f T=%.1fkeV", e.v0, e.v1); break;
+                L.lane = "sys";
+                L.text = (e.arg == 1)
+                    ? fmt("gate vde_detected fired Z=%.2fm dZdt=%.1fm/s — heating killed, VDE outrunning", e.v0, e.v1)
+                    : fmt("gate quench_precursor fired f_rad=%.2f T=%.1fkeV", e.v0, e.v1);
+                break;
             case EvKind::SpineShutdown:
                 L.lane = "sys"; L.text = fmt("shutdown spine gate=quench_precursor — SPINE_SHUTDOWN verdict f_rad=%.2f", e.v0); break;
             case EvKind::TerminalTQ:
                 L.lane = "plant";
                 L.text = (e.arg == 1)
                     ? fmt("terminal thermal_quench cause=density_limit f_GW=%.2f T=%.1fkeV", e.v1, e.v0)
+                    : (e.arg == 2)
+                    ? fmt("terminal thermal_quench cause=vde Z=%.2fm wall contact", e.v0)
                     : fmt("terminal thermal_quench cause=radiative_collapse T=%.2fkeV f_rad=%.2f", e.v0, e.v1);
+                break;
+            case EvKind::Innov:
+                L.lane = "plant";
+                L.text = fmt("innov mag=%.1fs cluster=vertical Z=%.0fmm", e.v0, e.v1 * 1000.0);
                 break;
             case EvKind::TerminalCQ:
                 L.lane = "plant"; L.text = fmt("terminal current_quench tau_cq=%.1fms Ip=%.1fMA", e.v0, e.v1); break;

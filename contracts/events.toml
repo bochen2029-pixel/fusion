@@ -13,7 +13,9 @@
 # therefore fires on the PER-CLUSTER MAHALANOBIS statistic over a decimated window,
 # one event max per cluster per window, dwell + refractory, storm collapse above.
 aggregation_window_ms = 250
-dwell_windows   = 2        # N-of-M: statistic must exceed threshold 2 consecutive windows
+dwell_windows   = 2        # N-of-M at sigma_token: 2 consecutive windows (slow anomalies)
+# D-035: sigma_alarm fires SINGLE-WINDOW (no dwell) — a fast transient (a kick, a crash)
+# lives in one window and must still tokenize; dwell is for the slow/sustained class.
 refractory_ms   = 1000     # per-cluster minimum gap between events
 storm_collapse_after = 4   # >4 events from one cluster in 10 s -> one storm summary + counter
 clusters = ["vertical", "radial", "density", "current", "thermal"]

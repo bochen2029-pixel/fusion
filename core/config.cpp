@@ -88,9 +88,27 @@ GatesCfg load_gates(const std::string& path) {
     toml::table t = toml::parse_file(path);
     GatesCfg g;
     if (auto v = t["quench_precursor"]["dwell_ticks"].value<int64_t>()) g.qp_dwell_ticks = int(*v);
+    g.z_trip_m = num(t, "vde_detected", "z_trip_m", 0.12);
+    g.zdot_trip = num(t, "vde_detected", "zdot_trip_m_per_s", 2.0);
+    if (auto v = t["vde_detected"]["dwell_ticks"].value<int64_t>()) g.vde_dwell_ticks = int(*v);
     // frad_trip 1.0 and the T-halving-in-2ms term mirror the [quench_precursor].predicate
     // prose in spine_gates.toml; M1 promotes them to typed keys.
     return g;
+}
+
+InnovCfg load_innov(const std::string& path) {
+    toml::table t = toml::parse_file(path);
+    InnovCfg c;
+    const double win_ms = num(t, "innovation", "aggregation_window_ms", 250.0);
+    c.window_ticks = (long)(win_ms * 1e-3 / 1e-4 + 0.5);
+    if (auto v = t["innovation"]["sigma_token"]["vertical"].value<double>())
+        c.sigma_token_vertical = *v;
+    if (auto v = t["innovation"]["sigma_alarm"]["vertical"].value<double>())
+        c.sigma_alarm_vertical = *v;
+    if (auto v = t["innovation"]["dwell_windows"].value<int64_t>()) c.dwell_windows = int(*v);
+    const double refr_ms = num(t, "innovation", "refractory_ms", 1000.0);
+    c.refractory_ticks = (long)(refr_ms * 1e-3 / 1e-4 + 0.5);
+    return c;
 }
 
 DispersionsCfg load_dispersions(const std::string& path) {
@@ -134,9 +152,17 @@ ScenarioCfg load_scenario(const std::string& path) {
                     s.puff_t_lo = (*et)["t_lo"].value_or(8.0);
                     s.puff_t_hi = (*et)["t_hi"].value_or(20.0);
                 }
+                if (ty == "vde_kick") {
+                    s.vde_kick = true;
+                    s.kick_mm = (*et)["mag_mm"].value_or(25.0);
+                    s.kick_t_lo = (*et)["t_lo"].value_or(5.0);
+                    s.kick_t_hi = (*et)["t_hi"].value_or(5.0);
+                }
             }
         }
     }
+    s.vert_on = t["vertical"]["enabled"].value_or(false);
+    s.vs_on = t["vertical"]["vs_on"].value_or(true);
     s.scenario_id = fnv1a32(s.name);
     return s;
 }
@@ -150,6 +176,8 @@ GainsCfg load_gains(const std::string& path) {
     g.P_ff_MW = num(t, "pid", "P_ff_MW", 33.0);
     g.S_ff_e20 = num(t, "pid", "S_ff_e20", 2.5);
     g.Krad = num(t, "pid", "Krad", 0.9);
+    g.Kpz = num(t, "vs", "Kpz", 5.0e4);
+    g.Kdz = num(t, "vs", "Kdz", 200.0);
     return g;
 }
 

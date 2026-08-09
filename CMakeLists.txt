@@ -37,6 +37,10 @@ add_executable(test_golden tests/test_golden.cpp)
 target_link_libraries(test_golden PRIVATE fusion_core)
 add_test(NAME golden_check COMMAND test_golden ${CMAKE_SOURCE_DIR})
 
+add_executable(test_vertical tests/test_vertical.cpp)
+target_link_libraries(test_vertical PRIVATE fusion_core)
+add_test(NAME vertical_enemy COMMAND test_vertical ${CMAKE_SOURCE_DIR})
+
 # ---- M0.5: fusor_shadow — the thesis-slice triple (llama.cpp in-process, delay-loaded
 # from C:/llama.cpp at runtime; import libs vendored — auricle's proven pattern)
 set(LLAMA_TP ${CMAKE_SOURCE_DIR}/third_party/llama.cpp)

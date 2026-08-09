@@ -36,6 +36,7 @@ static int run(int argc, char** argv) {
     in.s = load_scenario(scen_path);
     in.k = gains_path.empty() ? load_gains(root + "/control/gains_m0.toml")
                               : load_gains(gains_path);
+    in.ic = load_innov(root + "/contracts/events.toml");
     RunResult r = run_sim(in, seed, true);
     std::printf("fusor  %s seed=%llu  H98=%.3f  puff@%.2fs\n", in.s.name.c_str(),
                 (unsigned long long)seed, r.H98_drawn, r.t_puff);

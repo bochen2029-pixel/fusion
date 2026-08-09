@@ -1,0 +1,42 @@
+# vde_open_loop — M1 slice 1: THE ENEMY, unopposed. VS feedback OFF; the seeded vertical
+# displacement grows at the wall-set rate, the spine gate fires (and honestly cannot
+# re-stabilize — it kills heating, bounding energy), the column reaches the wall:
+# TQ cause=vde -> CQ -> disrupt. F-SHAPE-1's first clause, on tape.
+
+[meta]
+name         = "vde_open_loop"
+class        = "demo"
+description  = "open-loop vertical: gate fires, VDE completes, full death chain"
+activates_at = "M1"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 3.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[vertical]
+enabled      = true
+vs_on        = false
+
+[disturbances]
+events = []
+
+[pass]
+metric       = "survival"
+q_min        = 0.0
+hold_s       = 0.0
+seed_count   = 1
+pass_frac    = 0.0
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"

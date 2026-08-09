@@ -1,0 +1,44 @@
+# vde_kick — M1 slice 1: the enemy, opposed. VS feedback ON (observer-in-the-loop: the
+# PD feeds back the EKF estimate, never truth); a 25 mm kick at ~5 s; the controller
+# recovers; the innovation gate tokenizes the surprise ([plant] innov cluster=vertical —
+# the upward seam's missing lane, live).
+
+[meta]
+name         = "vde_kick"
+class        = "curriculum"
+description  = "kick + recover under VS feedback; innovation events fire"
+activates_at = "M1"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 12.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[vertical]
+enabled      = true
+vs_on        = true
+
+[disturbances]
+# 60 mm: the kick must stand above the slice-1 PD null's own ~2-4 cm limit cycle
+# (measured, receipted — the dance itself is F-NULL-C fodder for M2's controllers)
+events = [ { type = "vde_kick", mag_mm = 60.0, t_lo = 5.0, t_hi = 5.0 } ]
+
+[pass]
+metric       = "survival"
+q_min        = 1.0
+hold_s       = 5.0
+seed_count   = 100
+pass_frac    = 0.95
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"
