@@ -450,3 +450,30 @@ offline oracle (CEM teacher, decorrelated stream) proving the curriculum ≥95%,
 the gate attempt + receipts.
 
 **Next (S15): the fence + the oracle + F-SHAPE-1.** Then KICKOFF_M2.
+
+---
+
+## S15 · 2026-08-09 · M1 slice 8 — the fence, the oracle, F-SHAPE-1 GREEN. **M1 DONE.**
+
+**Done (branch `m1-shape`; receipts `runs/m1-fshape1-2026-08-09.md` + `runs/m1s8/`;
+D-043):** the statecheck fence (CTL-14b) — the policy runtime (burn PIDs + rad-ff +
+VS PD, the S10–S14 math verbatim) now lives in `control/policy.cpp` behind
+`control/obs.h`; poison guards in the true-state headers; the `statecheck` ctest
+(include-closure walk + token scan) registered as the hard gate. **The refactor is
+bit-identical — the golden fnv is the proof.** The oracle ruling (D-043): the
+CEM-tuned null is the constructive solvability proof at M1; the per-seed trajectory
+teacher is M2's, pre-registered. **F-SHAPE-1 GREEN, attempt 1:** open-loop VDE death
+chain on tape (0.186 s) · oracle 100/100 on easy · vde_kick · hl_backtransition ·
+rampdown at gate seeds 900000:900100 (Wilson LB 0.963 each) · EKF NIS [1.29, 1.40]
+in the pre-registered [0.5, 2.0], kicks tokenized 20/20 · determinism 8/8 including
+the pipeline counters. ROADMAP flipped; **KICKOFF_M2 written** (the cerebellum:
+solver-then-distill + PPO, F-NULL-C vs this null; the owed items pre-registered:
+LQ null, deep lethal-legal, per-seed oracle, bolometer/rogowski channels).
+
+**Honest state:** M1 DONE per DEFINITION_OF_DONE — gate receipt with reproduce
+block; determinism green on committed goldens; the organ IS the null (P-13 stated);
+docs synced this commit; KICKOFF_M2 exists; snapshot taken. The day's arc S7–S15:
+nine M1 slices, D-035…D-043, all on `m1-shape`, merged to `main` at the gate.
+
+**Next:** a fresh session opens **`KICKOFF_M2.md`** (branch `m2-cerebellum`) — the
+cerebellum. The null to beat is receipted and waiting.
