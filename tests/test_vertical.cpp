@@ -86,6 +86,8 @@ int main(int argc, char** argv) {
     // Wall-clock lives HERE, outside run_sim — the sim path stays clock-free.
     if (argc > 2 && std::string(argv[2]) == "budget") {
         const GainsCfg bk = (argc > 3) ? load_gains(argv[3]) : in.k;
+        NetMLP bnet;                                        // D-049: optional net (arg 5)
+        const bool have_net = (argc > 4) && bnet.load(argv[4]);
         VerticalModel bm; bm.build(m, vd.k_dest_Npm);
         VerticalEKF be; be.init(bm, 0.75e-3, 20.0);
         PolicyState bps{};
@@ -95,9 +97,11 @@ int main(int argc, char** argv) {
         for (int b = 0; b < NB; ++b) {
             const auto t0 = std::chrono::high_resolution_clock::now();
             for (int i = 0; i < BATCH; ++i) {
+                const double innorm = be.innov_last /
+                    std::sqrt(be.S_last > 1e-30 ? be.S_last : 1e-30);
                 const VertObs bo{ be.xz, be.xv, xb[2 + VerticalModel::NP],
-                                  be.x[2], be.x[3], bm.k_dest };
-                const double V = policy_vs(bo, bk, bps);
+                                  be.x[2], be.x[3], bm.k_dest, innorm };
+                const double V = policy_vs(bo, bk, bps, have_net ? &bnet : nullptr);
                 bm.retune(8.5e6 - (i & 15) * 1e3, vd.k_dest_Npm);   // D-041 per-tick path
                 bm.step_rk4(xb, V, 1e-4);
                 be.predict(V, 1e-4);
@@ -109,9 +113,9 @@ int main(int argc, char** argv) {
             if (xb[0] > 0.15) { xb[0] = 1e-3; for (int i = 1; i < VerticalModel::N; ++i) xb[i] = 0; }
         }
         std::sort(ns_per.begin(), ns_per.end());
-        std::printf("tick budget (retune + step + EKF + policy_vs[%s], batch-of-%d "
+        std::printf("tick budget (retune + step + EKF + policy_vs[%s%s], batch-of-%d "
                     "medians): p50 %.0f ns  p99 %.0f ns  p99.9 %.0f ns  (100 us tick)\n",
-                    bk.lq_on ? "LQ" : "PD", BATCH,
+                    bk.lq_on ? "LQ" : "PD", have_net ? "+net" : "", BATCH,
                     ns_per[NB / 2], ns_per[int(NB * 0.99)], ns_per[NB - 2]);
         return 0;
     }

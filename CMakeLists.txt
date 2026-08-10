@@ -64,6 +64,11 @@ add_executable(test_ghost tests/test_ghost.cpp)
 target_link_libraries(test_ghost PRIVATE fusion_core)
 add_test(NAME ghost_fork COMMAND test_ghost ${CMAKE_SOURCE_DIR})
 
+# M2 S19 (D-049): the net-runtime KAT + residual identity (flat-weight inference substrate)
+add_executable(test_net tests/test_net.cpp)
+target_link_libraries(test_net PRIVATE fusion_core)
+add_test(NAME net_runtime COMMAND test_net ${CMAKE_SOURCE_DIR})
+
 # ---- M0.5: fusor_shadow — the thesis-slice triple (llama.cpp in-process, delay-loaded
 # from C:/llama.cpp at runtime; import libs vendored — auricle's proven pattern)
 set(LLAMA_TP ${CMAKE_SOURCE_DIR}/third_party/llama.cpp)

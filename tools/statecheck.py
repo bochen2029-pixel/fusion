@@ -8,7 +8,7 @@
 import os, re, sys
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else "."
-FENCE_TUS = ["control/policy.cpp", "control/policy.h", "control/obs.h"]
+FENCE_TUS = ["control/policy.cpp", "control/policy.h", "control/obs.h", "control/net.h"]
 FORBIDDEN_HEADERS = ["physics_tier0.h", "sim.h", "sim_env.h", "transport.h", "vertical.h",
                      "gs.h", "gs_free.h", "philox.h"]   # sim_env.h = the plant (D-048)
 ALLOWED_PROJECT = {"control/obs.h", "control/policy.h", "core/config.h"}

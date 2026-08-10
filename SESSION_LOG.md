@@ -670,3 +670,41 @@ teacher, the CUDA port of step(). Watch the sim-vs-wall-time trap in the trainer
 (decorrelated teacher stream, relay Q16), solver-then-distill onto the residual-on-LQG net
 (relay Q1/Q15), the action-injection API, and the export byte-golden + KAT (relay Q18). The
 frozen curriculum (S17b) is the target; the SimEnv (S18) is the substrate. Branch `m2-cerebellum`.
+
+---
+
+## S19 · 2026-08-10 · M2 — the net inference substrate (partial-commit; M2 open)
+
+**Done (branch `m2-cerebellum`; receipt `runs/m2s19-net-2026-08-10.md`; D-049):** the
+residual-on-LQG runtime BEFORE the training — the ship-runtime-before-you-train pattern a
+third time (S16 the LQ, S18 the plant, now the net). `control/net.h` `NetMLP`: a flat-weight
+MLP (trainer/export_net.py exports the byte format), CPU, fixed-order dot products
+(/fp:strict, bit-reproducible), depth pinned at 2 hidden layers (spec §3), width in the file
+header (v1=64). **Residual-on-LQG** (relay Q1/Q15): policy_vs runs u = -K(kd)(x_hat with a
+net Z-REFERENCE OFFSET, +/-10 mm) — the offset, not a weak raw-voltage residual (the LQG
+makes it the near-rail phase lead). Obs (relay Q19): z/v/q_s/i_vs estimates + observer k_dest
++ the RAW innovation nu/sqrt(S), 3-frame stacked = 18 in. Fence-legal (net.h std-only, added
+to statecheck FENCE_TUS).
+
+**Measured:** KAT — the exported weights load into net.h and reproduce the exporter's output
+to **9e-9** (float32; Python<->C++ agreement + regression golden); zero weights -> 0; **a
+zero-net sim run is BIT-IDENTICAL to the pure null** across 3 seeds (the residual path is
+zero-cost at zero weights). Budget (§7.4, relay Q18): retune+step+EKF+policy_vs[LQ+net]
+p99.9 = **11.2 us** of the 50 us tick (net adds ~7 us; 4.5x headroom — the FORWARD_NOTES §5
+estimate confirmed). ctest 11/11 -> **12/12** (net_runtime).
+
+**Null result (DoD 3):** N/A — no organ shipped; the net runtime is proven zero-cost at zero
+weights (== the null). The composite null remains the baseline; the trained net is S20+.
+
+**Honest state:** M2 OPEN. The net's inference path, export, KAT, budget, and fence are all
+in place and verified — trained weights slot in with no plumbing risk. Deferred to S20: the
+MPPI/CEM teacher (its decorrelated-stream / clairvoyance-trap subtlety, D-011, warrants
+fresh context — the M1 instance's "budget it as a real slice"), then solver-then-distill,
+then the burn residual head + the e2e stretch arm.
+
+**Next (S20): the teacher** — the per-seed MPPI/CEM trajectory oracle on the SimEnv fork
+machinery (relay Q16: vertical 80 ms/5 ms segments, CEM pop 64), DECORRELATED teacher stream
+(D-011 — the fork shares the plant's stream, but the teacher must re-seed rollout draws from
+stream 1; the clairvoyance-cannot-beat-chance ctest). Then S21 distill onto the net (S19
+substrate) + PPO polish + the F-NULL-C attempt against the frozen curriculum (S17b). WATCH
+the sim-vs-wall-time trap (nuclear ADR-020). Branch `m2-cerebellum`.
