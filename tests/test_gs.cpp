@@ -35,6 +35,20 @@ int main(int argc, char** argv) {
     if (!(std::fabs(eq.Z_axis) < 0.10)) { std::puts("GS RED: axis off midplane"); return 1; }
     if (!(eq.li > 0.1 && eq.li < 2.5)) { std::puts("GS RED: li band"); return 1; }
 
-    std::puts("GS GREEN (slice 2a: solver analytic-verified; equilibrium machinery live)");
+    // (3) slice 2b first piece: the SHAPED equilibrium — Shafranov shift outboard,
+    //     q95 on the real FUSOR-1 D-shape vs the machine.toml design estimate (~3.0)
+    GsGrid gs2;
+    ShapedEq sh = gs_shaped(m, gs2);
+    std::printf("shaped: Ip %.2f MA  axis shift %+.0f mm  q0 %.2f  q95 %.2f "
+                "(design est 3.0; floor 2.2)\n",
+                sh.eq.Ip_A / 1e6, sh.shift_mm, sh.q0, sh.q95);
+    if (std::fabs(sh.eq.Ip_A / 1e6 - m.Ip_MA) > 0.05 * m.Ip_MA) {
+        std::puts("GS RED: shaped Ip normalization"); return 1; }
+    if (!(sh.shift_mm > 0 && sh.shift_mm < 200)) {
+        std::puts("GS RED: Shafranov shift direction/magnitude"); return 1; }
+    if (!(sh.q95 > 2.2 && sh.q95 < 4.5)) { std::puts("GS RED: q95 band"); return 1; }
+    if (!(sh.q0 < sh.q95)) { std::puts("GS RED: q monotonicity"); return 1; }
+
+    std::puts("GS GREEN (2a solver verified; 2b shaped equilibrium + q95 live)");
     return 0;
 }

@@ -282,3 +282,21 @@ numerical heart (slice 2a). Missing: shaped/free boundary, q95, transport, model
 EKF, oracle, F-SHAPE-1 — slice 2b+, next session, same branch.
 
 **Next:** SESSION PAUSE by operator's request — handoff to be written jointly.
+
+---
+
+## S9 · 2026-08-09 · M1 slice 2b first piece — the shape exists (same session; then HANDOFF)
+
+**Done (branch `m1-shape`; receipt `runs/m1s2b-shaped-2026-08-09.md`; D-037):** shaped
+fixed-boundary equilibrium on the real FUSOR-1 D-shape via masked SOR over the verified
+core — Ip 8.50 MA exact, **Shafranov shift +27 mm outboard**, **q0 1.08 / q95 3.61**
+(design est 3.0; floor 2.2 — measurable at last). ctest 7/7. Session handoff written:
+`docs/HANDOFF_2026-08-09.md`; KICKOFF_M1 refreshed with slice status.
+
+**Honest state:** M1 OPEN — done: the enemy (slice 1), the verified solver core (2a),
+the shaped equilibrium + q95 (2b-1). Remaining: the vertical↔equilibrium MERGE (k_dest
+from the decay index), free-boundary + von Hagenow + X-point, transport, model-based
+EKF + χ² NIS, the oracle, F-SHAPE-1.
+
+**Next:** a fresh session reads `docs/HANDOFF_2026-08-09.md` + `KICKOFF_M1.md`, branch
+`m1-shape`, starting with the MERGE task.

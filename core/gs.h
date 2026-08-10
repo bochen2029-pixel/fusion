@@ -160,4 +160,142 @@ inline GsEquilibrium gs_picard(const MachineCfg& m, GsGrid& g, int n_picard = 15
     return eq;
 }
 
+// ---- slice 2b (first piece): the SHAPED fixed-boundary equilibrium + q-profile -----
+// The plasma boundary is the Miller D-shape from machine.toml (kappa_sep, delta);
+// the SOR solves only inside it (nearest-node mask, first-order at the boundary —
+// scaling grade, stated). F(psi) = R0*B0 held constant (paramagnetic correction few
+// percent — stated). q(psi) by contour integration on theta-rays from the axis.
+struct ShapedEq {
+    GsEquilibrium eq;
+    double q0 = 0, q95 = 0;
+    double shift_mm = 0;                     // axis R - R0 (Shafranov, should be > 0)
+};
+
+inline ShapedEq gs_shaped(const MachineCfg& m, GsGrid& g, int n_picard = 18) {
+    const double mu0 = 1.25663706212e-6, PI = 3.14159265358979;
+    g.init(m);
+    // Miller boundary polygon + point-in-polygon mask
+    const int NB = 256;
+    std::vector<double> Rb(NB), Zb(NB);
+    const double d0 = std::asin(std::clamp(m.delta, 0.0, 0.95));
+    for (int k = 0; k < NB; ++k) {
+        const double th = 2.0 * PI * k / NB;
+        Rb[k] = m.R0 + m.a * std::cos(th + d0 * std::sin(th));
+        Zb[k] = m.kappa_sep * m.a * std::sin(th);
+    }
+    auto inside = [&](double R, double Z) {
+        bool in = false;
+        for (int k = 0, j = NB - 1; k < NB; j = k++) {
+            if (((Zb[k] > Z) != (Zb[j] > Z)) &&
+                (R < (Rb[j] - Rb[k]) * (Z - Zb[k]) / (Zb[j] - Zb[k]) + Rb[k]))
+                in = !in;
+        }
+        return in;
+    };
+    std::vector<char> mask(g.psi.size(), 0);
+    for (int iz = 1; iz < GsGrid::NZ - 1; ++iz)
+        for (int ir = 1; ir < GsGrid::NR - 1; ++ir)
+            mask[size_t(iz) * GsGrid::NR + ir] = inside(g.R(ir), g.Z(iz)) ? 1 : 0;
+
+    // masked SOR (psi = 0 outside/boundary; the plasma is a psi<0 well)
+    auto solve_masked = [&](const std::vector<double>& rhs, int sweeps) {
+        const double idR2 = 1.0 / (g.dR * g.dR), idZ2 = 1.0 / (g.dZ * g.dZ);
+        for (int s = 0; s < sweeps; ++s)
+            for (int iz = 1; iz < GsGrid::NZ - 1; ++iz)
+                for (int ir = 1; ir < GsGrid::NR - 1; ++ir) {
+                    if (!mask[size_t(iz) * GsGrid::NR + ir]) { g.at(ir, iz) = 0.0; continue; }
+                    const double R = g.R(ir);
+                    const double aE = idR2 - 1.0 / (2.0 * R * g.dR);
+                    const double aW = idR2 + 1.0 / (2.0 * R * g.dR);
+                    const double diag = -2.0 * idR2 - 2.0 * idZ2;
+                    const double res = rhs[size_t(iz) * GsGrid::NR + ir]
+                        - aE * g.at(ir + 1, iz) - aW * g.at(ir - 1, iz)
+                        - idZ2 * (g.at(ir, iz + 1) + g.at(ir, iz - 1))
+                        - diag * g.at(ir, iz);
+                    g.at(ir, iz) += 1.85 * res / diag;
+                }
+    };
+
+    for (auto& v : g.psi) v = 0.0;
+    std::vector<double> rhs(g.psi.size(), 0.0);
+    double p0 = 1.0e4, f1 = 1.0;
+    ShapedEq out;
+    const double Ip_target = m.Ip_MA * 1e6;
+    for (int it = 0; it < n_picard; ++it) {
+        double pmin = 0.0; int ax_ir = GsGrid::NR / 2, ax_iz = GsGrid::NZ / 2;
+        for (int iz = 1; iz < GsGrid::NZ - 1; ++iz)
+            for (int ir = 1; ir < GsGrid::NR - 1; ++ir)
+                if (mask[size_t(iz) * GsGrid::NR + ir] && g.at(ir, iz) < pmin) {
+                    pmin = g.at(ir, iz); ax_ir = ir; ax_iz = iz;
+                }
+        const double span = (0.0 - pmin) > 1e-30 ? -pmin : 1e-30;
+        double Ip_now = 0;
+        for (int iz = 1; iz < GsGrid::NZ - 1; ++iz)
+            for (int ir = 1; ir < GsGrid::NR - 1; ++ir) {
+                const size_t k = size_t(iz) * GsGrid::NR + ir;
+                if (!mask[k]) { rhs[k] = 0; continue; }
+                const double R = g.R(ir);
+                const double pb = std::clamp((g.at(ir, iz) - pmin) / span, 0.0, 1.0);
+                const double w = (it == 0) ? 1.0 : (1.0 - pb);
+                const double pprime = -p0 * w, ffprime = -f1 * w;
+                const double Jphi = -(R * pprime + ffprime / (mu0 * R));
+                rhs[k] = -mu0 * R * R * pprime - ffprime;
+                Ip_now += Jphi * g.dR * g.dZ;
+            }
+        const double scale = Ip_target / (std::fabs(Ip_now) > 1.0 ? Ip_now : 1.0);
+        p0 *= scale; f1 *= scale;
+        for (auto& v : rhs) v *= scale;
+        solve_masked(rhs, 2500);
+        out.eq.psi_axis = pmin; out.eq.psi_bnd = 0.0;
+        out.eq.R_axis = g.R(ax_ir); out.eq.Z_axis = g.Z(ax_iz);
+        out.eq.Ip_A = Ip_now * scale; out.eq.picard_iters = it + 1;
+    }
+    out.shift_mm = (out.eq.R_axis - m.R0) * 1e3;
+
+    // q(psi_bar) via theta-ray contours from the axis; F = R0*B0 (stated approximation)
+    auto psi_at = [&](double R, double Z) {                 // bilinear
+        const double fr = (R - g.Rmin) / g.dR, fz = (Z - g.Zmin) / g.dZ;
+        const int ir = std::clamp(int(fr), 0, GsGrid::NR - 2);
+        const int iz = std::clamp(int(fz), 0, GsGrid::NZ - 2);
+        const double tr = fr - ir, tz = fz - iz;
+        return (1 - tr) * (1 - tz) * g.at(ir, iz) + tr * (1 - tz) * g.at(ir + 1, iz)
+             + (1 - tr) * tz * g.at(ir, iz + 1) + tr * tz * g.at(ir + 1, iz + 1);
+    };
+    auto grad_at = [&](double R, double Z, double& gR, double& gZ) {
+        const double h = 0.5 * g.dR;
+        gR = (psi_at(R + h, Z) - psi_at(R - h, Z)) / (2 * h);
+        gZ = (psi_at(R, Z + h) - psi_at(R, Z - h)) / (2 * h);
+    };
+    auto q_of = [&](double pbar) {
+        const double target = out.eq.psi_axis * (1.0 - pbar);   // psi<0 well, bnd=0
+        const int NTH = 128;
+        double integ = 0, prevR = 0, prevZ = 0, firstR = 0, firstZ = 0;
+        for (int k = 0; k <= NTH; ++k) {
+            const double th = 2.0 * PI * k / NTH;
+            double lo = 0.0, hi = 1.0;                       // ray: axis -> boundary poly
+            const double bR = m.R0 + m.a * std::cos(th + d0 * std::sin(th));
+            const double bZ = m.kappa_sep * m.a * std::sin(th);
+            for (int b = 0; b < 40; ++b) {                    // bisection on psi
+                const double mid = 0.5 * (lo + hi);
+                const double R = out.eq.R_axis + mid * (bR - out.eq.R_axis);
+                const double Z = out.eq.Z_axis + mid * (bZ - out.eq.Z_axis);
+                (psi_at(R, Z) < target) ? lo = mid : hi = mid;
+            }
+            const double R = out.eq.R_axis + lo * (bR - out.eq.R_axis);
+            const double Z = out.eq.Z_axis + lo * (bZ - out.eq.Z_axis);
+            if (k == 0) { firstR = prevR = R; firstZ = prevZ = Z; continue; }
+            const double dl = std::sqrt((R - prevR) * (R - prevR) + (Z - prevZ) * (Z - prevZ));
+            double gR, gZ; grad_at(0.5 * (R + prevR), 0.5 * (Z + prevZ), gR, gZ);
+            const double gp = std::sqrt(gR * gR + gZ * gZ);
+            integ += dl / (0.5 * (R + prevR) * (gp > 1e-9 ? gp : 1e-9));
+            prevR = R; prevZ = Z;
+        }
+        (void)firstR; (void)firstZ;
+        return (m.R0 * m.B0) / (2.0 * PI) * integ;
+    };
+    out.q95 = q_of(0.95);
+    out.q0 = q_of(0.10);                      // near-axis proxy (grid resolution floor)
+    return out;
+}
+
 } // namespace fusion

@@ -1,5 +1,12 @@
 # KICKOFF — M1 · the shape and the enemy (bootstrap for the next session)
 
+> **STATUS 2026-08-09 (S7–S9): slices 1, 2a, 2b-1 are DONE and merged** — the enemy
+> (γ from the eigenproblem, VDE death chain, live innovation lane; D-035), the verified
+> Δ* core (4e-6 vs Solov'ev; D-036), and the shaped equilibrium (shift +27 mm,
+> q95 = 3.61; D-037). **Read `docs/HANDOFF_2026-08-09.md` FIRST** — it carries the
+> remaining-work order (start with the vertical↔equilibrium MERGE), the open judgment
+> calls, and the gotchas. The scope list below remains the milestone's full charter.
+
 **Read first, in order:** `CLAUDE.md` → `FUSION_ARCHITECTURE_v0.2.md` **§2.1 tier-1,
 §2.4, §3 (EKF + statecheck), §8 F-SHAPE-1, §9-M1** → `contracts/machine.toml` ([vessel],
 [coils] — the passive-conductor inputs and the 12 circuits) → `contracts/diagnostics.toml`

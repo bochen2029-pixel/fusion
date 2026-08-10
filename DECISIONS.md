@@ -287,3 +287,12 @@ cross-session with the operator ratifying.*
   direction claim (the rectangle-shell BC measurably biases the axis 134 mm inboard —
   reported, not hidden), the DST/CR fast solver, transport coupling, the model-based
   EKF, the oracle, F-SHAPE-1. The tier-1 build now has its verified numerical heart.
+- **D-037 · 2026-08-09 · M1 slice 2b, first piece — the shaped equilibrium (M1 open).**
+  Masked-SOR fixed-boundary GS on the Miller D-shape over the analytic-verified core:
+  Ip exact, **Shafranov shift +27 mm outboard** (the 2a BC artifact resolved by
+  physics, not tuning), **q0 1.08 / q95 3.61** by ray-contour integration (F = R0·B0
+  stated; first-order boundary mask stated). The q95 governor floor (2.2) now has a
+  measured equilibrium behind it. Named next: the MERGE — vertical.h's calibrated
+  k_dest becomes DERIVED from this equilibrium's field (decay index), completing
+  report-don't-configure end-to-end; then free-boundary/von Hagenow, X-point,
+  model-EKF + χ² NIS, transport, oracle, F-SHAPE-1.
