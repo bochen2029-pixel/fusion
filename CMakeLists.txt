@@ -19,6 +19,10 @@ target_link_libraries(fusor PRIVATE fusion_core)
 add_executable(fusor_mc apps/fusor_mc_main.cpp)
 target_link_libraries(fusor_mc PRIVATE fusion_core)
 
+# M2 S18 (D-048): the batched-env runner (fourth consumer of one-dynamics-source, D-011)
+add_executable(fusor_train_env apps/fusor_train_env_main.cpp)
+target_link_libraries(fusor_train_env PRIVATE fusion_core)
+
 enable_testing()
 
 add_executable(test_replay tests/test_replay.cpp)
@@ -50,6 +54,15 @@ add_test(NAME gs_solver COMMAND test_gs ${CMAKE_SOURCE_DIR})
 add_executable(test_feed tests/test_feed.cpp membrane/feed.cpp)
 target_link_libraries(test_feed PRIVATE fusion_core)
 add_test(NAME feed_render COMMAND test_feed)
+
+# M2 S18 (D-048): the stepwise-plant parity gate + the ghost-fork PoC (relay Q18/Q23)
+add_executable(test_parity_env tests/test_parity_env.cpp)
+target_link_libraries(test_parity_env PRIVATE fusion_core)
+add_test(NAME parity_train_env COMMAND test_parity_env ${CMAKE_SOURCE_DIR})
+
+add_executable(test_ghost tests/test_ghost.cpp)
+target_link_libraries(test_ghost PRIVATE fusion_core)
+add_test(NAME ghost_fork COMMAND test_ghost ${CMAKE_SOURCE_DIR})
 
 # ---- M0.5: fusor_shadow — the thesis-slice triple (llama.cpp in-process, delay-loaded
 # from C:/llama.cpp at runtime; import libs vendored — auricle's proven pattern)

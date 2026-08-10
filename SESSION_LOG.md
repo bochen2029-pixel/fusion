@@ -631,3 +631,42 @@ test, generated verification oracle, no-op-path fixtures).
 batched-env runner (CPU-first), run_sim refactored to a stepwise SimEnv proven
 bit-identical (the relay Q13 surgery), the parity ctest, and the ghost fork PoC (relay
 Q23, promoted). Branch `m2-cerebellum`. Mind the sim-vs-wall-time trap (nuclear ADR-020).
+
+---
+
+## S18 · 2026-08-10 · M2 — the stepwise plant + batched envs + the ghost PoC (partial-commit; M2 open)
+
+**Done (branch `m2-cerebellum`; receipt `runs/m2s18-simenv-2026-08-10.md`; D-048):** the
+foundation the training stands on. run_sim's ~330-line one-shot loop body EXTRACTED into
+`core/sim_env.h` `struct SimEnv` (state in members, `step()` = one tick, run_sim = a thin
+`reset/while(step)/finish` wrapper). **The extraction is BIT-IDENTICAL — the golden fnv did
+not move** (golden_check + replay_oracle + the new parity gate all green; the S15 fence
+pattern: proven by the byte-stream). Fence held: sim_env.h is a true-state header (added to
+statecheck FORBIDDEN_HEADERS), includes policy.h LAST so PolicyState is a value member
+without arming the poison. Built on it:
+- **fusor_train_env** — the batched runner (spec's FOURTH one-dynamics-source consumer,
+  D-011): parallel SimEnv rollouts sharing ONE FreeContext (relay Q13 law), CPU-first.
+  MEASURED (16 threads): easy flat-top **10.76 Mtick/s** (~1.5 µs/tick/thread, matching the
+  relay §4 estimate); vde_kick vertical+pipeline 1.46 Mtick/s.
+- **parity_train_env** ctest (relay Q18): stepwise==one-shot AND threaded==serial,
+  bit-exact on vde_kick/rampdown/easy (thread-safety rides gs_solve's thread_local scratch
+  + the const shared context — the relay Q13 landmine inventory, clean).
+- **ghost_fork** ctest (relay Q23 promoted): the fork is `SimEnv g = plant;` — (i) two
+  forks run bit-identically to the plant (F-GHOST criterion i, same fnv e6ddf198…); (ii) a
+  fork with VS off from T takes the kick and DISRUPTS (z_max 0.190) while the plant
+  survives — the M3 ghost's counterfactual-via-command mechanism, de-risked warm.
+ctest 9/9 -> **11/11**.
+
+**Null result (DoD 3):** N/A this slice — no organ shipped; the SimEnv IS the plant,
+proven bit-identical to the gated one. The composite null still runs inside it unchanged.
+
+**Honest state:** M2 OPEN. The plant is now stepwise + batched + forkable, bit-exact and
+thread-safe, ~11 Mtick/s flat-top on 16 cores. Deferred to S19: the net's action-injection
+hook (SimEnv is the seam; step() currently runs the in-binary null), the per-seed MPPI/CEM
+teacher, the CUDA port of step(). Watch the sim-vs-wall-time trap in the trainer/queue
+(nuclear ADR-020, memory reference-nuclear-cousin).
+
+**Next (S19): the teacher + the trained arm** — the per-seed MPPI/CEM trajectory oracle
+(decorrelated teacher stream, relay Q16), solver-then-distill onto the residual-on-LQG net
+(relay Q1/Q15), the action-injection API, and the export byte-golden + KAT (relay Q18). The
+frozen curriculum (S17b) is the target; the SimEnv (S18) is the substrate. Branch `m2-cerebellum`.
