@@ -5,6 +5,8 @@
 #include "philox.h"
 #include "vertical.h"
 #include "gs.h"
+#include "gs_free.h"
+#include <cstdio>
 #include <cmath>
 #include <algorithm>
 
@@ -108,21 +110,33 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     // stated version of the same shaping. Textbook derivative filtering, not LQ.)
     const double LP_A = 1.0 - std::exp(-2.0 * 3.14159265358979 * 60.0 * DT_TICK);
     const InnovCfg icfg = in.ic;       // events.toml [innovation], loaded by the caller
+    // D-041: the free-boundary equilibrium is the RUNTIME k_dest source (D-039's
+    // pre-registered rewiring; the fixed-boundary derive is now the verification
+    // cross-check). Per-run tracking state copies from the shared converged seed.
+    std::shared_ptr<const FreeContext> fctx;
+    GsFreeSolver::FreeTrack ftrack;
+    VerticalModel vnom;                // the filter's knowledge (nominal, relinked)
+    VertDerived vd_now;                // latest SOLVED equilibrium derive (plant truth)
+    VertDerived vd_pend;               // in-flight pipeline result (applies at +50)
+    uint64_t pipe_apply = ~0ull;       // apply tick of the in-flight solve
+    double Ip_solve_ref = 0.0, z_solve_ref = 0.0, Ip_prev_solve = 0.0;
+    bool reval_latched = false;
     if (sc.vert_on) {
-        // the MERGE (D-038): k_dest arrives from the shaped equilibrium, never a constant
-        const VertDerived vd = in.vd.set ? in.vd : gs_vertical_derive(m);
+        fctx = in.fctx ? in.fctx : gs_free_context(m);
+        fctx->solver.seed_track(fctx->seed, ftrack);
+        vd_now = fctx->solver.derive_at_axis(ftrack.st, fctx->ref.eq.Ip_A);
+        Ip_solve_ref = fctx->ref.eq.Ip_A; Ip_prev_solve = fctx->ref.eq.Ip_A;
         // D-040: the plant is built with the drawn plant_scatter truths (tau_wall,
         // actuated-circuit R — b2.g1/b3.g0, drawn-reserved since M0, now consumed);
         // the EKF inits from the NOMINAL build. That gap IS the D-023 information set.
         const double tw_sc = std::clamp(1.0 + in.d.tauw_frac * b2.g1, 0.80, 1.20);
         const double cr_sc = std::clamp(1.0 + in.d.coilR_frac * b3.g0, 0.90, 1.10);
-        vmod.build(m, vd.k_dest_Npm, tw_sc, cr_sc);        // the scattered truth
+        vmod.build(m, vd_now.k_dest_Npm, tw_sc, cr_sc);    // the scattered truth
         r.gamma_wall = vmod.gamma_wall; r.gamma_open = vmod.gamma_open;
         xvert[0] = in.d.z0_mm * 1e-3 * b1.g1;              // the drawn z0 jitter, at last
-        {
-            VerticalModel vnom; vnom.build(m, vd.k_dest_Npm);   // the filter's knowledge
-            vekf.init(vnom, 0.75e-3, 20.0);   // magnetics 4-probe avg; coil 0.2% of 10 kA
-        }
+        z_solve_ref = xvert[0];
+        vnom.build(m, vd_now.k_dest_Npm);
+        vekf.init(vnom, 0.75e-3, 20.0);       // magnetics 4-probe avg; coil 0.2% of 10 kA
         zlat[0] = zlat[1] = xvert[0]; ilat[0] = 0.0;
         if (sc.vde_kick) {
             const double kt = sc.kick_t_lo + (sc.kick_t_hi - sc.kick_t_lo) * b4.u1;
@@ -130,6 +144,8 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
         }
     }
 
+    FILE* trc = (in.trace_path && sc.vert_on) ? std::fopen(in.trace_path, "wb") : nullptr;
+    if (trc) std::fprintf(trc, "t\tz\tv\txz\txv\tnu\tS\tIvs\txI\tVcmd\tkd_p\tkd_o\tIp\n");
     for (uint64_t tick = 0; tick <= n_ticks; ++tick) {
         const double t = double(tick) * DT_TICK;
 
@@ -137,6 +153,64 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
 
         // ---- vertical channel, per tick (10 kHz control + EKF + innovation gate) ----
         if (sc.vert_on && mode == RUN) {
+            // ---- the D-024 pipeline (D-041): solve@T applies@T+50 (200 Hz slots);
+            // |dZ| beyond the linearization bound forces an early re-solve; a request
+            // hitting an in-flight solve is a gs_late event (deterministic surrogate
+            // of wall-late — the request coalesces). The solve itself is ONE warm
+            // tracking iteration of the free-boundary equilibrium at the CURRENT Ip
+            // (skipped-and-reused when the state hasn't moved — identical result).
+            {
+                // APPLY first (same-tick sequencing: a solve dispatched at T applies at
+                // T+50 BEFORE the T+50 request check — else every slot collides with
+                // its own predecessor and the cadence silently halves; measured)
+                if (tick == pipe_apply) {
+                    pipe_apply = ~0ull;
+                    // observer re-linearization at apply; x and P CARRY (D-023 clause).
+                    // The observer's Ip is the MEASURED plasma current (rogowski-class;
+                    // noise-free at tier-1, stated — D-041): the plant retunes with the
+                    // same s.Ip, so the coupling gap is the tracked-k_dest residual,
+                    // not a standing 2% jitter offset (which the loop pumped at the
+                    // artifact frequency — measured, receipted).
+                    vnom.retune(s.Ip, vd_pend.k_dest_Npm);
+                    vekf.relink(vnom);
+                    r.k_dest_end = vd_pend.k_dest_Npm;
+                }
+                const bool slot = (tick % 50) == 0;
+                const bool revalidate = std::fabs(xvert[0] - z_solve_ref) > 0.020;
+                const bool inflight = pipe_apply != ~0ull;
+                if (slot || revalidate) {
+                    if (inflight) {
+                        // one gs_late per UNSERVED REQUEST (edge-triggered), not per
+                        // tick of the collision window
+                        if (revalidate && !reval_latched) {
+                            ev(tick, EvKind::GsLate, 0, xvert[0], z_solve_ref);
+                            ++r.gs_late;
+                            reval_latched = true;
+                        }
+                    } else {
+                        const bool moved = std::fabs(s.Ip - Ip_prev_solve) >
+                                           1e-4 * std::fabs(Ip_prev_solve);
+                        if (moved || revalidate) {
+                            vd_pend = fctx->solver.track_step(m, ftrack, s.Ip);
+                            Ip_prev_solve = s.Ip;
+                            ++r.gs_solves;
+                        } else vd_pend = vd_now;           // stationary: reuse (identical)
+                        pipe_apply = tick + 50;
+                        z_solve_ref = xvert[0];
+                        reval_latched = false;
+                        // the PLANT is truth — its equilibrium follows immediately;
+                        // the +50 latency is the OBSERVER's (above)
+                        vd_now = vd_pend;
+                        Ip_solve_ref = s.Ip;
+                    }
+                }
+                // per-tick plant retune: linear-in-Ip anchor to the latest solve (the
+                // coil field is FROZEN, so k_dest = -2piR*Ip*dBz/dR scales with Ip^1;
+                // the Ip^2 law was the FIXED-boundary scaling where the implied
+                // external field itself carried Ip — D-041 distinction)
+                const double scale = (Ip_solve_ref > 1.0) ? s.Ip / Ip_solve_ref : 1.0;
+                vmod.retune(s.Ip, vd_now.k_dest_Npm * scale);
+            }
             if (tick == kick_tick) vmod.kick_state(xvert, sc.kick_mm * 1e-3);   // D-039
             // observer-in-the-loop (CTL-11/21): the VS PD feeds back the EKF ESTIMATE
             double Vcmd = 0.0;
@@ -168,6 +242,12 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
                                         icfg.sigma_token_vertical, icfg.sigma_alarm_vertical,
                                         icfg.dwell_windows, icfg.refractory_ticks);
             if (mag > 0) { ev(tick, EvKind::Innov, 0, mag, xvert[0]); ++r.innov_events; }
+            if (trc && (tick % 5 == 0))
+                std::fprintf(trc, "%.4f\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g"
+                                  "\t%.6g\t%.6g\t%.6g\t%.6g\n",
+                             t, xvert[0], xvert[1], vekf.xz, vekf.xv, vekf.innov_last,
+                             vekf.S_last, xvert[2 + VerticalModel::NP], vekf.x[3],
+                             Vcmd_applied, vmod.k_dest, vnom.k_dest, s.Ip);
             // spine gate [vde_detected]: fires, receipts, kills heating — and honestly
             // cannot re-stabilize an uncontrolled mode (spine_gates [demo_interaction])
             if (std::fabs(xvert[0]) > in.g.z_trip_m && std::fabs(xvert[1]) > in.g.zdot_trip)
@@ -206,35 +286,46 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             const double en = sc.n_set_e20 - s.ne / 1e20;
             double sg = (k.S_ff_e20 + pidN.step(en, dt_pid, k.Kpn, k.Kin, 0.0, true)) * 1e20;
             sg = std::clamp(sg, 0.0, m.S_gas_max_e20 * 1e20);
-            // ---- governor floors (M0-active) ----
-            if (s.ne >= in.f.greenwald_max_frac * m.nGW_e20 * 1e20) sg = 0.0;   // refuse up
+            // ---- governor floors (M0-active; D-041: the Greenwald boundary tracks
+            // the LIVE Ip — n_GW = Ip/(pi a^2) is Ip-proportional; never binds in the
+            // committed tier-0 goldens' regime, verified by golden_check) ----
+            const double nGW_now = m.nGW_e20 * 1e20 * (s.Ip / (m.Ip_MA * 1e6));
+            if (s.ne >= in.f.greenwald_max_frac * nGW_now) sg = 0.0;            // refuse up
             if (s.ne <= in.f.nmin_e20 * 1e20) sg = m.S_gas_max_e20 * 1e20;      // refuse down
             c.Sgas_cmd = sg;
 
             // ---- RK4 burn step, h = 1 ms (the sub-cycle law) ----
+            // D-041: the scheduled [ramp] rate enters the integrator here — the ONE
+            // dynamics source; floors pre-checked at scenario load (0.6 < 0.85 MA/s)
+            const double dIp = (sc.ramp && t >= sc.ramp_t0 && t < sc.ramp_t1)
+                ? (sc.ramp_ip_end_MA - sc.Ip_MA) * 1e6 / (sc.ramp_t1 - sc.ramp_t0) : 0.0;
             const double h = dt_pid;
-            const State k1 = rhs(s, d, c, m, tau_act);
+            const State k1 = rhs(s, d, c, m, dIp, tau_act);
             State s2 = s;
             s2.W += 0.5 * h * k1.W; s2.ne += 0.5 * h * k1.ne; s2.nHe += 0.5 * h * k1.nHe;
             s2.nimp += 0.5 * h * k1.nimp; s2.psi += 0.5 * h * k1.psi; s2.Pal += 0.5 * h * k1.Pal;
+            s2.Ip += 0.5 * h * k1.Ip;
             s2.Paux += 0.5 * h * k1.Paux; s2.Sgas += 0.5 * h * k1.Sgas;
-            const State k2 = rhs(s2, derive(s2, m, H98), c, m, tau_act);
+            const State k2 = rhs(s2, derive(s2, m, H98), c, m, dIp, tau_act);
             State s3 = s;
             s3.W += 0.5 * h * k2.W; s3.ne += 0.5 * h * k2.ne; s3.nHe += 0.5 * h * k2.nHe;
             s3.nimp += 0.5 * h * k2.nimp; s3.psi += 0.5 * h * k2.psi; s3.Pal += 0.5 * h * k2.Pal;
+            s3.Ip += 0.5 * h * k2.Ip;
             s3.Paux += 0.5 * h * k2.Paux; s3.Sgas += 0.5 * h * k2.Sgas;
-            const State k3 = rhs(s3, derive(s3, m, H98), c, m, tau_act);
+            const State k3 = rhs(s3, derive(s3, m, H98), c, m, dIp, tau_act);
             State s4 = s;
             s4.W += h * k3.W; s4.ne += h * k3.ne; s4.nHe += h * k3.nHe;
             s4.nimp += h * k3.nimp; s4.psi += h * k3.psi; s4.Pal += h * k3.Pal;
+            s4.Ip += h * k3.Ip;
             s4.Paux += h * k3.Paux; s4.Sgas += h * k3.Sgas;
-            const State k4 = rhs(s4, derive(s4, m, H98), c, m, tau_act);
+            const State k4 = rhs(s4, derive(s4, m, H98), c, m, dIp, tau_act);
             const double w = h / 6.0;
             s.W += w * (k1.W + 2 * k2.W + 2 * k3.W + k4.W);
             s.ne += w * (k1.ne + 2 * k2.ne + 2 * k3.ne + k4.ne);
             s.nHe += w * (k1.nHe + 2 * k2.nHe + 2 * k3.nHe + k4.nHe);
             s.nimp += w * (k1.nimp + 2 * k2.nimp + 2 * k3.nimp + k4.nimp);
             s.psi += w * (k1.psi + 2 * k2.psi + 2 * k3.psi + k4.psi);
+            s.Ip += w * (k1.Ip + 2 * k2.Ip + 2 * k3.Ip + k4.Ip);
             s.Pal += w * (k1.Pal + 2 * k2.Pal + 2 * k3.Pal + k4.Pal);
             s.Paux += w * (k1.Paux + 2 * k2.Paux + 2 * k3.Paux + k4.Paux);
             s.Sgas += w * (k1.Sgas + 2 * k2.Sgas + 2 * k3.Sgas + k4.Sgas);

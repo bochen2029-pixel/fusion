@@ -3,6 +3,7 @@
 #include "core/sim.h"
 #include "core/vertical.h"
 #include "core/gs.h"
+#include "core/gs_free.h"
 #include "core/philox.h"
 #include <cstdio>
 #include <cstdlib>
@@ -17,15 +18,19 @@ int main(int argc, char** argv) {
     const std::string root = argc > 1 ? argv[1] : ".";
     const MachineCfg m = load_machine(root + "/contracts/machine.toml");
 
-    // (0) the MERGE (D-038): k_dest arrives from the shaped equilibrium — derived,
-    //     never configured. gamma now moves with the equilibrium through the shape.
+    // (0) the runtime k_dest source is the FREE-BOUNDARY equilibrium (D-041 rewired
+    //     per D-039's pre-registration); the fixed-boundary derive (D-038) remains
+    //     the independent cross-check — both printed, ratio band held in test_gs.
+    const auto fctx = gs_free_context(m);
     const VertDerived vd = gs_vertical_derive(m);
-    std::printf("derived: n_decay %.3f  Bz_ext %.3f T  k_dest %.3e N/m  (R_axis %.3f)\n",
-                vd.n_decay, vd.Bz_ext_axis_T, vd.k_dest_Npm, vd.R_axis_m);
+    std::printf("derived: FREE k_dest %.3e (n %.3f, Bz %.3f T)  |  fixed-bnd cross-check "
+                "%.3e (ratio %.2f)\n",
+                fctx->ref.k_dest_Npm, fctx->ref.n_decay, fctx->ref.Bz_ext_axis_T,
+                vd.k_dest_Npm, fctx->ref.k_dest_Npm / vd.k_dest_Npm);
 
-    // (1) gamma bands — REPORTED from the eigenproblem, the CLASS pre-registered:
-    // wall-set 10–100 ms (machine.toml [vessel] expectation 25–40); no-wall < 2 ms.
-    VerticalModel vm; vm.build(m, vd.k_dest_Npm);
+    // (1) gamma bands — REPORTED from the eigenproblem at the RUNTIME k_dest, the
+    // CLASS pre-registered: wall-set 10–100 ms; no-wall < 8 ms.
+    VerticalModel vm; vm.build(m, fctx->ref.k_dest_Npm);
     const double gi_wall = 1.0 / vm.gamma_wall, gi_open = 1.0 / vm.gamma_open;
     std::printf("gamma^-1: with passives %.1f ms (open %.3f ms)  k_dest %.3g N/m  "
                 "kwall %.3g N/m (margin %.2f)  m_eff %.1f kg  rho_shell %.3g\n",
@@ -69,7 +74,8 @@ int main(int argc, char** argv) {
     in.d = load_dispersions(root + "/contracts/dispersions.toml");
     in.k = load_gains(root + "/control/gains_m0.toml");
     in.ic = load_innov(root + "/contracts/events.toml");
-    in.vd = vd;                     // computed once above; run_sim would re-derive per run
+    in.vd = vd;                     // the cross-check record (unused by run_sim now)
+    in.fctx = fctx;                 // the runtime context, once (D-041)
 
     // ---- DEV budget mode: test_vertical <root> budget — the §7.4 tick-budget datum
     // (KICKOFF build note: measure the linear step + EKF early, receipt p99.9).
@@ -84,6 +90,7 @@ int main(int argc, char** argv) {
             const auto t0 = std::chrono::high_resolution_clock::now();
             for (int i = 0; i < BATCH; ++i) {
                 const double V = -(5e4 * be.xz + 200.0 * be.xv);
+                bm.retune(8.5e6 - (i & 15) * 1e3, vd.k_dest_Npm);   // D-041 per-tick path
                 bm.step_rk4(xb, std::clamp(V, -2000.0, 2000.0), 1e-4);
                 be.predict(V, 1e-4);
                 be.update(xb[0] + 1e-4 * ((i & 7) - 3.5)); // deterministic dither
@@ -142,6 +149,7 @@ int main(int argc, char** argv) {
     if (argc > 5 && std::string(argv[2]) == "events") {
         in.s = load_scenario(argv[3]);
         in.k = load_gains(argv[4]);
+        in.trace_path = "runs/m1s6/simtrace.tsv";   // DEV forensics (D-041)
         for (int i = 5; i < argc; ++i) {
             const uint64_t seed = std::strtoull(argv[i], nullptr, 10);
             RunResult r = run_sim(in, seed, true);

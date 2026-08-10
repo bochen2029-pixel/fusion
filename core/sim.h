@@ -4,6 +4,7 @@
 #include "physics_tier0.h"
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 namespace fusion {
 
@@ -22,6 +23,9 @@ enum class EvKind : uint32_t {
     PhaseStart = 0, CtrlSatOn = 1, CtrlSatOff = 2, GateFire = 3,
     TerminalTQ = 4, TerminalCQ = 5, TerminalDisrupt = 6, SpineShutdown = 7,
     Innov = 8,          // [plant] innov mag=Xs cluster=vertical (M1 slice 1)
+    GsLate = 9,         // D-024/D-041: a revalidation request hit an in-flight solve —
+                        // the pipeline could not serve it timely (deterministic
+                        // surrogate of wall-late; F-KEEPUP's aggregate-pacing datum)
 };
 struct EventRec { uint64_t tick; EvKind kind; uint32_t arg; double v0, v1; };
 #pragma pack(pop)
@@ -39,19 +43,26 @@ struct RunResult {
     double z_max_m = 0.0;                         // max |Z| over the run
     double nis_mean = 0.0;                        // EKF consistency statistic
     long   innov_events = 0;
+    long   gs_solves = 0, gs_late = 0;           // D-041 pipeline accounting
+    double k_dest_end = 0.0;                     // last applied k_dest (ramp receipts)
     uint64_t fnv = 0;               // FNV-1a64 over the golden byte stream
     std::vector<GoldenRec> golden;  // filled when record=true
     std::vector<EventRec> events;   // filled when record=true (the tap rides the golden flag)
 };
 
+struct FreeContext;                 // gs_free.h (D-041): tables + converged seed state
+
 struct SimInputs {
     MachineCfg m; FloorsCfg f; GatesCfg g; DispersionsCfg d; ScenarioCfg s; GainsCfg k;
     InnovCfg ic;                    // events.toml [innovation] (M1 slice 1)
-    VertDerived vd;                 // equilibrium-derived vertical inputs (D-038).
-                                    // Callers that Monte-Carlo vert_on scenarios fill it
-                                    // ONCE (gs_vertical_derive); run_sim computes it on
-                                    // demand when unset (correct, ~0.5 s — fine for
-                                    // single runs, wasteful in loops).
+    VertDerived vd;                 // fixed-boundary derive (D-038) — since D-041 the
+                                    // VERIFICATION cross-check; the runtime k_dest
+                                    // source is the free-boundary context below.
+    std::shared_ptr<const FreeContext> fctx;   // D-041: built ONCE per process by MC
+                                    // callers (gs_free_context); run_sim builds on
+                                    // demand when unset (correct, ~2 s — single runs).
+    const char* trace_path = nullptr;   // DEV-ONLY: per-tick vertical TSV (forensics;
+                                    // file I/O in the loop — never set in gates/MC)
 };
 
 RunResult run_sim(const SimInputs& in, uint64_t seed, bool record);

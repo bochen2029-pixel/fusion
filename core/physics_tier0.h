@@ -106,6 +106,7 @@ inline Derived derive(const State& s, const MachineCfg& m, double H98) {
 
 // RHS of the burn ODEs (actuator commands held constant across a step).
 inline State rhs(const State& s, const Derived& d, const Cmds& c, const MachineCfg& m,
+                 double dIp_dt,
                  double tau_act_eff) {
     State ds{};
     ds.W = d.Pheat - d.Prad - d.Pcond;
@@ -120,7 +121,8 @@ inline State rhs(const State& s, const Derived& d, const Cmds& c, const MachineC
     ds.Pal = (d.Palpha_inst - s.Pal) / tau_s;
     ds.Paux = (c.Paux_cmd - s.Paux) / tau_act_eff;
     ds.Sgas = (c.Sgas_cmd - s.Sgas) / m.tau_gas_s;
-    ds.Ip = 0.0;                                   // flat-top at M0 (ramp scenarios: M1)
+    ds.Ip = dIp_dt;                                // scheduled [ramp] rate (D-041); 0 at
+                                                   // flat-top — bit-identical to M0 there
     return ds;
 }
 

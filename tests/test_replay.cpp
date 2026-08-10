@@ -2,6 +2,7 @@
 // Same (scenario, seed, empty input tape) twice => bit-identical golden byte stream.
 #include "core/sim.h"
 #include "core/gs.h"
+#include "core/gs_free.h"
 #include <cstdio>
 #include <cstring>
 
@@ -31,22 +32,32 @@ int main(int argc, char** argv) {
                     (unsigned long long)seed, a.golden.size(),
                     (unsigned long long)a.fnv, (unsigned long long)b.fnv);
     }
-    // The MERGE (D-038): the vde path with the equilibrium in the loop. The precomputed
-    // (SimInputs.vd set) and on-demand (unset) derivations must yield BIT-IDENTICAL
-    // runs — gs_vertical_derive is a pure deterministic function of the machine config.
+    // D-041: the vde path with the free-boundary pipeline in the loop. The precomputed
+    // (SimInputs.fctx set) and on-demand (unset) contexts must yield BIT-IDENTICAL
+    // runs — gs_free_context is a pure deterministic function of the machine config.
     in.s = load_scenario(root + "/contracts/scenarios/vde_kick.toml");
-    in.vd = VertDerived{};                          // unset: run_sim derives internally
+    in.fctx.reset();                                // unset: run_sim builds internally
     RunResult u = run_sim(in, 777, true);
-    in.vd = gs_vertical_derive(in.m);               // set: the caller-precomputed path
+    in.fctx = gs_free_context(in.m);                // set: the caller-precomputed path
     RunResult p = run_sim(in, 777, true);
     if (u.golden.size() != p.golden.size() ||
         std::memcmp(u.golden.data(), p.golden.data(),
                     u.golden.size() * sizeof(GoldenRec)) != 0 || u.fnv != p.fnv) {
-        std::fprintf(stderr, "REPLAY ORACLE RED: vd precomputed vs on-demand diverged\n");
+        std::fprintf(stderr, "REPLAY ORACLE RED: fctx precomputed vs on-demand diverged\n");
         return 1;
     }
     std::printf("replay vde_kick 777: precomputed==on-demand, fnv %016llx  OK\n",
                 (unsigned long long)p.fnv);
+    // the RAMP path replays bit-exactly too (the pipeline schedule is deterministic)
+    in.s = load_scenario(root + "/contracts/scenarios/rampdown.toml");
+    RunResult ra = run_sim(in, 4242, true);
+    RunResult rb = run_sim(in, 4242, true);
+    if (ra.fnv != rb.fnv || ra.gs_solves != rb.gs_solves || ra.gs_late != rb.gs_late) {
+        std::fprintf(stderr, "REPLAY ORACLE RED: rampdown pipeline diverged\n");
+        return 1;
+    }
+    std::printf("replay rampdown 4242: fnv %016llx  gs_solves %ld  gs_late %ld  OK\n",
+                (unsigned long long)ra.fnv, ra.gs_solves, ra.gs_late);
     std::puts("REPLAY ORACLE GREEN");
     return 0;
 }

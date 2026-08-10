@@ -44,16 +44,21 @@ struct VerticalModel {
                                     // screened fast oscillation sits near F_SCREEN_HZ
                                     // (10 kHz-controllable, EKF-trackable), floored at
                                     // M_EFF_FLOOR; documented, gamma-insensitive (ctest)
-    static constexpr double F_SCREEN_HZ = 180.0, M_EFF_FLOOR = 5.0, ZETA_SCREEN = 0.7;
+    static constexpr double F_SCREEN_HZ = 180.0, M_EFF_FLOOR = 5.0, ZETA_SCREEN = 1.2;
     double d_eff = 0.0;             // N·s/m — the regularization's matching damping
                                     // (D-040): fake inertia with NO fake damping left
                                     // the screened artifact RESONANT — the noisy loop
                                     // pumped it into a 179 Hz, ±60-90 mm standing
                                     // limit cycle (traced, receipted; S11's "hold"
                                     // contained the smaller version). ZETA_SCREEN
-                                    // critically damps the artifact BY CONSTRUCTION;
-                                    // the slow mode's gamma shifts ~7% and is, as
-                                    // always, REPORTED from the eigenproblem.
+                                    // OVERDAMPS the artifact BY CONSTRUCTION (D-041
+                                    // raised 0.7 -> 1.2: off the design point the full
+                                    // spectrum's fast mode shifts ~25% below the
+                                    // reduced model's — 136 vs 180 Hz measured at Ip
+                                    // 7.0 — and the estimate-fed loop pumped the
+                                    // mismatch; overdamped, it cannot ring at all).
+                                    // The slow mode's gamma shifts with d_eff and is,
+                                    // as always, REPORTED from the eigenproblem.
     double k_dest = 0.0;            // N/m — DERIVED input (gs_vertical_derive; D-038)
     double c_p[NP];                 // force per passive ampere = Ip * dM_pj/dZ [N/A]
     double c_vs = 0.0;
@@ -66,6 +71,8 @@ struct VerticalModel {
     double rho_shell = 0.0;          // the calibrated surface-resistivity scalar (rep.)
     double screen_[NC] = {0};        // flux-conserving current pattern per meter (D-039)
     double tau_wall_used = 0.025;    // the (possibly scattered) vessel tau this build used
+    double cpA_[NP] = {0}, cvsA_ = 0;   // per-AMPERE couplings (geometry cache, D-041:
+                                        // retune() rebuilds A from these as Ip ramps)
     double gamma_open = 0.0;        // reported: no-shell growth rate [1/s] (VS passive)
     double gamma_wall = 0.0;        // reported: with-shell growth rate [1/s]
 
@@ -126,20 +133,21 @@ struct VerticalModel {
             ds[j] = 0.5 * (dp + dm);
             aw[j] = 0.5 * ds[j];
         }
-        // plasma-circuit coupling: dM/dZ by symmetric difference at Z=0 (fixed h)
+        // plasma-circuit coupling: dM/dZ by symmetric difference at Z=0 (fixed h);
+        // cached PER AMPERE — retune() rescales as Ip ramps (D-041)
         const double h = 1e-3, Ip = m.Ip_MA * 1e6;
         for (int j = 0; j < NP; ++j) {
-            const double dM = (ring_mutual(m.R0, Rf[j], Zf[j] - h) -
-                               ring_mutual(m.R0, Rf[j], Zf[j] + h)) / (2.0 * h);
-            c_p[j] = Ip * dM;                        // N/A (and V·s/m reciprocally)
+            cpA_[j] = (ring_mutual(m.R0, Rf[j], Zf[j] - h) -
+                       ring_mutual(m.R0, Rf[j], Zf[j] + h)) / (2.0 * h);
+            c_p[j] = Ip * cpA_[j];                   // N/A (and V·s/m reciprocally)
         }
         // VS pair (machine.toml [coils] VS1 row — one source, D-039), anti-series:
         // effective dM/dZ doubled
         const double Rvs_r = m.coil_r[11], Zvs = m.coil_z[11];
         vs_turns = m.coil_turns[11];
-        const double dMvs = (ring_mutual(m.R0, Rvs_r, Zvs - h) -
-                             ring_mutual(m.R0, Rvs_r, Zvs + h)) / (2.0 * h);
-        c_vs = 2.0 * vs_turns * Ip * dMvs;           // anti-series multi-turn pair
+        cvsA_ = 2.0 * vs_turns * (ring_mutual(m.R0, Rvs_r, Zvs - h) -
+                                  ring_mutual(m.R0, Rvs_r, Zvs + h)) / (2.0 * h);
+        c_vs = Ip * cvsA_;                           // anti-series multi-turn pair
         // ---- the FULL circuit inductance matrix (filaments + VS; D-038) ------------
         for (int i = 0; i < NP; ++i)
             for (int j = 0; j < NP; ++j)
@@ -184,6 +192,19 @@ struct VerticalModel {
                 for (int i = 0; i < NC; ++i) Minv[i][j] = col[i];
             }
         }
+        retune(Ip, k_dest_derived_Npm);
+        gamma_wall = dominant_growth(true);
+        gamma_open = dominant_growth(false);
+    }
+
+    // D-041: rebuild the operating-point-dependent pieces from the cached geometry as
+    // (Ip, k_dest) move through a ramp — no elliptics, no Cholesky; ~1k flops, safe to
+    // call per tick. gamma_wall/gamma_open are NOT recomputed here (report-time only).
+    void retune(double Ip_A, double k_dest_now) {
+        const double PI = 3.14159265358979;
+        k_dest = k_dest_now;
+        for (int j = 0; j < NP; ++j) c_p[j] = Ip_A * cpA_[j];
+        c_vs = Ip_A * cvsA_;
         // instantaneous screening stiffness (superconducting-circuits limit), REPORTED
         double cc[NC];
         for (int j = 0; j < NP; ++j) cc[j] = c_p[j];
@@ -194,18 +215,16 @@ struct VerticalModel {
         // the flux-conserving screening pattern (per meter of displacement): a physical
         // sudden-displacement disturbance co-moves the circuit currents by -screen_*dz
         // (D-039: a bare z teleport stores (1/2)(kwall-k_dest)dz^2 of ARTIFICIAL energy
-        // in the regularization's screened oscillator and rings it at ~omega*dz — the
-        // artifact killed curriculum seeds once the amended vessel weakened the screen;
-        // measured, receipted. On the slow manifold the excursion grows at gamma_wall —
-        // the true VDE onset.)
+        // in the regularization's screened oscillator; on the slow manifold the
+        // excursion grows at gamma_wall — the true VDE onset.)
         for (int i = 0; i < NC; ++i) {
             double s = 0.0;
             for (int j = 0; j < NC; ++j) s += Minv[i][j] * cc[j];
             screen_[i] = s;
         }
-        // the regularization: pin the screened-oscillation artifact near F_SCREEN_HZ
-        // (documented; if the shell cannot hold the shape at all — kwall <= k_dest —
-        // the mode is beyond passive stabilization and the class test must catch it)
+        // the regularization: pin the screened-oscillation artifact near F_SCREEN_HZ,
+        // critically damped (D-040); if the shell cannot hold the shape at all
+        // (kwall <= k_dest) the mode is beyond passive stabilization — class test's job
         const double w_t = 2.0 * PI * F_SCREEN_HZ;
         m_eff = (kwall_ > k_dest) ? std::max(M_EFF_FLOOR, (kwall_ - k_dest) / (w_t * w_t))
                                   : 30.0;
@@ -226,8 +245,6 @@ struct VerticalModel {
             A[2 + i][1] = -mc;
             B[2 + i] = Minv[i][NP];                  // VS drive leaks into the shell (phys.)
         }
-        gamma_wall = dominant_growth(true);
-        gamma_open = dominant_growth(false);
     }
 
     // dominant REAL growth rate: RK4-integrate at fine dt with periodic renormalization;
@@ -331,23 +348,28 @@ struct VerticalEKF {
     double Phi[NS][NS] = {0}, Bd[NS] = {0};
     double Qd[NS] = {0};            // diagonal discrete process noise (pre-registered)
     double Rz = 0, Ri = 0;
+    double cs_ = 0;                 // the current model's mode coupling (q_s coordinate)
     double xz = 0, xv = 0;          // mirrors of x[0], x[1] (controller taps)
     double nis_sum = 0; long nis_n = 0;
     double innov_last = 0, S_last = 1;
 
-    void init(const VerticalModel& nom, double sigma_z_m, double sigma_i_A) {
+    // Rebuild the filter's model (Phi/Bd/Qd) from a NOMINAL VerticalModel — called by
+    // init() and, at every pipeline apply, by relink() (D-023's covariance-carry
+    // clause: x and P survive re-linearization untouched; only the model moves).
+    void model_from(const VerticalModel& nom) {
         const double m_ = nom.m_eff, kd = nom.k_dest, cvs = nom.c_vs;
         const double Lv = nom.Lvs, Rv = nom.Rvs;            // nominal actuated circuit
         const double kwf = std::max(1e3, nom.kwall_ - cvs * cvs / Lv);
         const double cs = std::sqrt(kwf);                   // L_s = 1 convention
         // continuous A, B. The single collective mode is MOMENT-MATCHED: it carries
         // the exact instantaneous stiffness (cs^2 above), and its decay tau_s is
-        // CALIBRATED so the reduced 4-state's slow pole equals the plant's REPORTED
-        // gamma_wall — the multi-mode spectrum leaks ~1.5x faster than the pinned
-        // tau_wall alone suggests (measured: single-tau gave gamma 34 vs 50 /s and
-        // the filter lagged the growth systematically, NIS ~120 in-loop). Both
-        // numbers are derived from the same NOMINAL model — the information set is
-        // unchanged (D-023). Bisection below is deterministic, fixed count.
+        // CALIBRATED so the reduced slow pole equals the plant's REPORTED gamma_wall
+        // — the multi-mode spectrum leaks ~1.5x faster than the pinned tau_wall alone
+        // suggests (measured: single-tau gave gamma 34 vs 50 /s, filter lagged the
+        // growth, NIS ~120 in-loop). CLOSED FORM from the massless-limit slow-pole
+        // relation (D-041 — replaced the bisection so relink() is per-apply cheap):
+        //   kd = cs^2 g/(g + 1/tau_s) + cvs^2 g/(Lv g + Rv)  =>  solve for tau_s.
+        // Same nominal information set as the plant reports (D-023).
         double A[NS][NS] = {0}, B[NS] = {0};
         A[0][1] = 1.0;
         A[1][0] = kd / m_; A[1][1] = -nom.d_eff / m_;
@@ -356,48 +378,13 @@ struct VerticalEKF {
         A[3][1] = -cvs / Lv; A[3][3] = -Rv / Lv;
         B[3] = 1.0 / Lv;
         {
-            const double gam_t = nom.gamma_wall > 1.0 ? nom.gamma_wall : 1.0;
-            auto slow_pole = [&](double tau_s) {           // dominant growth of the 4x4
-                A[2][2] = -1.0 / tau_s;
-                double xs[NS] = { 1e-3, 0, 0, 0 };
-                const double dts = 2e-5; const int nst = 15000;   // 0.3 s window
-                double logn = 0, logn_half = 0;
-                for (int it = 0; it < nst; ++it) {
-                    double k1[NS], k2[NS], k3[NS], k4[NS], tt[NS];
-                    auto der = [&](const double* s2, double* d2) {
-                        for (int i = 0; i < NS; ++i) {
-                            double v2 = 0;
-                            for (int j2 = 0; j2 < NS; ++j2) v2 += A[i][j2] * s2[j2];
-                            d2[i] = v2;
-                        }
-                    };
-                    der(xs, k1);
-                    for (int i = 0; i < NS; ++i) tt[i] = xs[i] + 0.5 * dts * k1[i];
-                    der(tt, k2);
-                    for (int i = 0; i < NS; ++i) tt[i] = xs[i] + 0.5 * dts * k2[i];
-                    der(tt, k3);
-                    for (int i = 0; i < NS; ++i) tt[i] = xs[i] + dts * k3[i];
-                    der(tt, k4);
-                    for (int i = 0; i < NS; ++i)
-                        xs[i] += dts / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
-                    if ((it & 127) == 127) {
-                        double nr = 0; for (int i = 0; i < NS; ++i) nr += xs[i] * xs[i];
-                        nr = std::sqrt(nr > 0 ? nr : 1e-300);
-                        logn += std::log(nr);
-                        for (int i = 0; i < NS; ++i) xs[i] /= nr;
-                    }
-                    if (it == nst / 2) logn_half = logn;
-                }
-                double nr = 0; for (int i = 0; i < NS; ++i) nr += xs[i] * xs[i];
-                logn += 0.5 * std::log(nr > 0 ? nr : 1e-300);
-                return (logn - logn_half) / (nst * dts * 0.5);
-            };
-            double lo = 0.004, hi = 0.040;                 // gamma decreases with tau_s
-            for (int b = 0; b < 18; ++b) {
-                const double mid = 0.5 * (lo + hi);
-                (slow_pole(mid) > gam_t) ? lo = mid : hi = mid;
-            }
-            A[2][2] = -1.0 / (0.5 * (lo + hi));            // the calibrated mode decay
+            const double g = nom.gamma_wall > 1.0 ? nom.gamma_wall : 1.0;
+            const double rhs2 = kd - cvs * cvs * g / (Lv * g + Rv);
+            double tau_s = 0.0167;
+            if (rhs2 > 1e3 && cs * cs * g > rhs2 * g)
+                tau_s = 1.0 / (cs * cs * g / rhs2 - g);
+            tau_s = std::clamp(tau_s, 0.002, 0.100);
+            A[2][2] = -1.0 / tau_s;
         }
         // discrete Phi, Bd: 4 substeps of the 4th-order series (deterministic)
         const double dt = 1e-4, h = dt / 4.0;
@@ -447,6 +434,11 @@ struct VerticalEKF {
         Qd[1] = (3000.0 * dt) * (3000.0 * dt);
         Qd[2] = (0.2 * cs * 0.3 * dt) * (0.2 * cs * 0.3 * dt);
         Qd[3] = (1.5e4 * dt) * (1.5e4 * dt);
+        cs_ = cs;
+    }
+
+    void init(const VerticalModel& nom, double sigma_z_m, double sigma_i_A) {
+        model_from(nom);
         Rz = sigma_z_m * sigma_z_m;
         Ri = sigma_i_A * sigma_i_A;
         for (int i = 0; i < NS; ++i)
@@ -454,6 +446,24 @@ struct VerticalEKF {
         P[0][0] = 9e-6; P[1][1] = 1e-2; P[2][2] = 1e2; P[3][3] = 1e4;
         for (int i = 0; i < NS; ++i) x[i] = 0;
         xz = xv = 0;
+        nis_sum = 0; nis_n = 0;
+    }
+    // D-024 pipeline apply: the model re-linearizes; x and P CARRY (D-023's clause) —
+    // THROUGH THE COORDINATE JACOBIAN: q_s is a cs-scaled coordinate (force = cs*q_s),
+    // so the physical screen force is continuous only if q_s rescales by cs_old/cs_new
+    // (and P by the same map). Carrying x/P raw across ~500 ramp relinks misattributed
+    // the screen force faster than the filter could re-estimate it (tau_s ~ 17 ms vs
+    // the 5 ms apply cadence) — measured: post-ramp NIS ~95; with the Jacobian, the
+    // carry is exact. (States 0,1,3 are physical coordinates — identity map.)
+    void relink(const VerticalModel& nom) {
+        const double cs_old = cs_;
+        model_from(nom);
+        if (cs_old > 0 && cs_ > 0 && cs_old != cs_) {
+            const double rr = cs_old / cs_;
+            x[2] *= rr;
+            for (int j = 0; j < NS; ++j) { P[2][j] *= rr; P[j][2] *= rr; }
+        }
+        xz = x[0]; xv = x[1];
     }
 
     void predict(double Vcmd, double dt_unused) {

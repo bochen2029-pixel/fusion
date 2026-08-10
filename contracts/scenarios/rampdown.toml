@@ -1,0 +1,47 @@
+# rampdown — M1 slice 6 (D-041): the first scenario where the EQUILIBRIUM MOVES.
+# A floors-legal Ip rampdown (0.6 MA/s < floors 0.85) with the coil currents FROZEN at
+# the flat-top fit (no shape controller until M2): the coil field's RELATIVE strength
+# grows as Ip falls, elongation rises, the decay index deepens — gamma climbs while
+# every commanded value stays legal. The D-024 pipeline tracks it at 200 Hz; this is
+# the lethal-legal class's construction kit (FRESH-3), receipted at modest depth here.
+
+[meta]
+name         = "rampdown"
+class        = "curriculum"
+description  = "floors-legal Ip rampdown; equilibrium tracked; gamma moves"
+activates_at = "M1"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 10.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[vertical]
+enabled      = true
+vs_on        = true
+
+[ramp]
+ip_end_MA    = 7.0
+t_start_s    = 3.0
+t_end_s      = 5.5
+
+[pass]
+metric       = "survival"
+q_min        = 0.8    # a rampdown holds the burn LIT at reduced Ip (tau_E ~ Ip^0.93);
+                      # Q-performance criteria belong to flat-top scenarios (D-041)
+hold_s       = 5.0
+seed_count   = 100
+pass_frac    = 0.95
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"

@@ -370,3 +370,33 @@ cross-session with the operator ratifying.*
   §7.4 first datum: vertical step + EKF p99.9 = 2.44 µs of the 100 µs tick. Kivs
   droop remains available-unused; gains unchanged AGAIN (5e4/200 through three
   physics upgrades). Receipts runs/m1s5-ekf-2026-08-09.md + runs/m1s5/. ctest 7/7.
+- **D-041 · 2026-08-09 · M1 slice 6 — the equilibrium goes live (DST + the D-024
+  pipeline; M1 open).** The DST-I direct solver ships behind the SAME gs_solve
+  interface (Z diagonalized, Thomas in R; exact algebraic solve; SOR retained for
+  masked domains): every derived number print-identical to converged SOR, test_gs
+  5.5x faster, the warm tracking iteration ~1 ms — the pipeline's enabler. THE
+  PIPELINE: FreeContext (tables + converged seed, once per process) → per-run
+  tracking → ONE warm Picard iteration per 200 Hz slot at the current measured Ip
+  (real-time-GS pattern; coils frozen — no shape controller until M2). Honest
+  latency split: the PLANT retunes per tick from cached per-ampere geometry (k_dest
+  linear-in-Ip between solves — the FROZEN-coil law; Ip² was the fixed-boundary
+  case); the OBSERVER re-linearizes at apply (+50 ticks) with x/P carried through
+  the q_s COORDINATE JACOBIAN (D-023's covariance-carry clause done right). gs_late
+  = edge-triggered unserved-revalidation collision (deterministic wall-late
+  surrogate; EvKind 9); same-tick apply-before-check (the naive order halved the
+  cadence — measured). SCHEMA: scenario [ramp] block; rampdown.toml (floors-legal
+  0.6 MA/s; own pass floor q_min 0.8 — a rampdown holds the burn LIT, Q-performance
+  is flat-top business); ds.Ip integrates (the reserved M0 slot consumed); the
+  Greenwald floor tracks live Ip (tier-0 goldens unaffected, verified). MEASURED:
+  k_dest 2.547e7→2.375e7 tracked over 501 solves, 0 late; MC 20/20 GOOD (pass 18/20;
+  oracle slice owns ≥95%); replay bit-stable incl. pipeline counters. RUNTIME SOURCE
+  SWITCH per D-039's pre-registration: run_sim's k_dest now derives free-boundary
+  (γ⁻¹ 40.8 ms at margin 2.82, in class; the fixed-boundary derive = cross-check).
+  DEFECT FOUND+FIXED: off the design point the full spectrum's fast mode shifts
+  (136 vs 180 Hz at Ip 7.0) and the estimate-fed loop pumped the reduction mismatch
+  into a bounded ring (truth-fed clean — NIS 0.99); ZETA_SCREEN 0.7→1.2: the
+  artifact is OVERDAMPED by construction, cannot ring at any operating point;
+  rampdown NIS 93→1.02, reference suite [1.29, 1.41], separation 6.3x (original 5x
+  bound stands). §7.4: retune+step+EKF p99.9 = 3.78 µs / 100 µs. DEV forensics:
+  SimInputs.trace_path (never in gates). Receipts runs/m1s6-pipeline-2026-08-09.md +
+  runs/m1s6/. ctest 7/7.

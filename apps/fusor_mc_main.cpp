@@ -3,6 +3,7 @@
 //          [--dump-golden <seed> --goldens-dir <dir>]
 #include "core/sim.h"
 #include "core/gs.h"
+#include "core/gs_free.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -59,7 +60,10 @@ static int run(int argc, char** argv) {
     in.k = gains_path.empty() ? load_gains(root + "/control/gains_m0.toml")
                               : load_gains(gains_path);
     in.ic = load_innov(root + "/contracts/events.toml");
-    if (in.s.vert_on) in.vd = gs_vertical_derive(in.m);   // once per process (D-038)
+    if (in.s.vert_on) {
+        in.vd = gs_vertical_derive(in.m);       // fixed-boundary cross-check (D-038)
+        in.fctx = gs_free_context(in.m);        // the runtime source, once (D-041)
+    }
     const ObjectiveCfg obj = load_objective(root + "/contracts/objective.toml");
 
     if (dump_seed >= 0) {                       // golden production path

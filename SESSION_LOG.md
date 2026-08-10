@@ -393,3 +393,34 @@ movement), diagnostics into the burn loop + statecheck fence, the oracle, F-SHAP
 
 **Next:** the DST/CR fast solver + the D-024 pipeline (the pair that makes the
 equilibrium LIVE in the tick loop), branch `m1-shape`.
+
+---
+
+## S13 · 2026-08-09 · M1 slice 6 — the equilibrium goes live (DST + pipeline; same day, fresh session)
+
+**Done (branch `m1-shape`; receipt `runs/m1s6-pipeline-2026-08-09.md` + `runs/m1s6/`;
+D-041):** the named fast-solver + multi-rate pair. The DST-I direct solver behind the
+same gs_solve interface (exact; print-identical derived numbers; test_gs 5.5×; ~1 ms
+tracking iterations) enabled the D-024 pipeline: **the free-boundary equilibrium is
+now the RUNTIME k_dest source** (D-039's pre-registration discharged), tracked by one
+warm Picard iteration per 200 Hz slot at measured Ip, applied to the observer at +50
+ticks with the x/P carry done through the q_s coordinate Jacobian (D-023's clause).
+The plant retunes per tick from cached per-ampere geometry (linear-in-Ip — the
+frozen-coil law). **rampdown.toml (schema [ramp]) is the first scenario where the
+equilibrium moves: k_dest tracked −6.8% over 501 solves, 0 gs_late, MC 20/20 GOOD,
+replay bit-stable including pipeline counters.** The ramp exposed and killed two
+defects: pipeline same-tick sequencing (cadence silently halved) and — the real find —
+**the estimate-fed loop pumping the reduction's off-design-point fast-mode error (136
+vs 180 Hz at Ip 7.0; truth-fed clean, NIS 0.99): ZETA_SCREEN 0.7→1.2 overdamps the
+artifact by construction — rampdown NIS 93→1.02**, reference suite [1.29, 1.41],
+γ⁻¹ 40.8 ms, separation 6.3×. §7.4: retune+step+EKF p99.9 = 3.78 µs. ctest 7/7;
+tier-0 goldens untouched (Greenwald floor now tracks live Ip — verified inert there).
+
+**Honest state:** M1 OPEN — done: enemy (1), Δ* core (2a), shaped (2b-1), MERGE (3),
+free boundary (4), model-EKF + χ² NIS (5), DST + pipeline (6). Remaining: transport
+(l_i movement — the deep lethal-legal lever; profiles still the fixed family),
+diagnostics noise into the burn loop + statecheck fence, the oracle (CEM teacher —
+owns rampdown ≥95% and the curriculum), F-SHAPE-1.
+
+**Next:** transport + diagnostics + statecheck fence, or the oracle — KICKOFF_M1's
+remaining scope; branch `m1-shape`.
