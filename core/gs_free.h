@@ -311,7 +311,7 @@ struct GsFreeSolver {
     // tracking mode (one warm iteration per pipeline slot at the CURRENT Ip — the
     // real-time-GS pattern). Ip_target parameterizes ramps.
     void picard_iter(const MachineCfg& m, GsGrid& gw, PicardState& st, int sor_sweeps,
-                     double Ip_target) const {
+                     double Ip_target, double alpha = 1.0, double bp_scale = 1.0) const {
         const double mu0 = 1.25663706212e-6;
         const size_t ni = size_t(NR - 2) * (NZ - 2);
         // (a) plasma-field edge BC from the response matrix; SOR on the interior
@@ -406,9 +406,9 @@ struct GsFreeSolver {
                 const size_t k = size_t(iz) * NR + ir;
                 if (!st.mask[k]) continue;
                 const double pb = std::clamp((st.psi_tot[k] - st.psi_axis) / span, 0.0, 1.0);
-                const double w = 1.0 - pb;
+                const double w = std::pow(1.0 - pb, alpha);   // PHY-14 family (D-042)
                 const double R = gw.R(ir);
-                Jn[k] = w * (R * 1.0e4 + 1.0 / (mu0 * R));
+                Jn[k] = w * (R * 1.0e4 * bp_scale + 1.0 / (mu0 * R));
                 Ip_now += Jn[k] * dA;
             }
         const double Ip_t = Ip_target;
@@ -461,8 +461,9 @@ struct GsFreeSolver {
         tr.gw = g;                       // geometry copy (psi overwritten per solve)
         tr.st = converged;
     }
-    VertDerived track_step(const MachineCfg& m, FreeTrack& tr, double Ip_A) const {
-        picard_iter(m, tr.gw, tr.st, 0, Ip_A);
+    VertDerived track_step(const MachineCfg& m, FreeTrack& tr, double Ip_A,
+                           double alpha = 1.0, double bp_scale = 1.0) const {
+        picard_iter(m, tr.gw, tr.st, 0, Ip_A, alpha, bp_scale);
         return derive_at_axis(tr.st, Ip_A);
     }
 

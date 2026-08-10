@@ -424,3 +424,29 @@ owns rampdown ≥95% and the curriculum), F-SHAPE-1.
 
 **Next:** transport + diagnostics + statecheck fence, or the oracle — KICKOFF_M1's
 remaining scope; branch `m1-shape`.
+
+---
+
+## S14 · 2026-08-09 · M1 slice 7 — the plasma gains an interior (same day, fresh session)
+
+**Done (branch `m1-shape`; receipt `runs/m1s7-transport-2026-08-09.md` + `runs/m1s7/`;
+D-042):** the tier-1 physics completion. 1-D transport (20 nodes, implicit, χ
+calibrated in the operator's own discretization → τ_E(ref) = IPB98(ref) EXACTLY;
+power degradation backed into χ; two calibration bugs found and receipted), the
+evolving current-profile family (α → neoclassical peaking on τ_CR; β_p live into the
+GS split; l_i/q0 reported), **state-triggered sawteeth (7 emergent crashes in easy —
+the dispersions law's timing-from-state clause honored mechanically)**, burn PIDs on
+ECE/interferometer diagnostics, hl_backtransition scenario + b5 draw block +
+Sawtooth/HLBack event kinds. **Goldens regenerated — the pre-registered PHY-10 tier
+switch.** MEASURED: easy 100/100 (tier-1's honest new baseline), hl 20/20, rampdown
+20/20 with **k_dest tracked −11.9% through the ramp (the α/β_p lever adds −5.1% over
+fixed profiles)**, vde 20/20, replay bit-stable, ctest 7/7.
+
+**Honest state:** M1 OPEN — slices 1–7 done. The tier-1 stack (spec §2.1) is
+physically complete: enemy, equilibrium (fixed+free), pipeline, EKF, transport,
+profiles, disruption chain, scenario set (easy · vde_kick · vde_open_loop · rampdown
+· hl_backtransition). Remaining for F-SHAPE-1: the statecheck fence (ctest), the
+offline oracle (CEM teacher, decorrelated stream) proving the curriculum ≥95%, and
+the gate attempt + receipts.
+
+**Next (S15): the fence + the oracle + F-SHAPE-1.** Then KICKOFF_M2.

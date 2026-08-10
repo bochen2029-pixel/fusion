@@ -79,6 +79,7 @@ InnovCfg load_innov(const std::string& events_toml_path);
 struct DispersionsCfg {              // contracts/dispersions.toml
     double ip_frac = 0.02, n_frac = 0.05, T_frac = 0.05, z0_mm = 3.0;
     double H98_sig = 0.05, tauw_frac = 0.05, coilR_frac = 0.03, actlag_frac = 0.10;
+    double hl_lo = 0.70, hl_hi = 0.85;   // hl_backtransition_H98 step-target band (D-042)
     uint32_t stream_plant = 0;
 };
 
@@ -98,6 +99,9 @@ struct ScenarioCfg {                 // contracts/scenarios/<name>.toml
     bool   vde_kick = false; double kick_mm = 25.0, kick_t_lo = 5.0, kick_t_hi = 5.0;
     // M1 slice 6: [ramp] block (D-041 schema addition) — scheduled Ip ramp, floors-legal
     bool   ramp = false; double ramp_ip_end_MA = 8.5, ramp_t0 = 0.0, ramp_t1 = 0.0;
+    // M1 slice 7: hl_backtransition disturbance (D-042) — H98 steps to the drawn
+    // target for dur_s, then recovers (the drawn timeline: dispersions b5 block)
+    bool   hl = false; double hl_t_lo = 4.0, hl_t_hi = 6.0, hl_dur_s = 1.5;
     uint32_t scenario_id = 0;        // fnv1a32 of name — part of the Philox counter
 };
 

@@ -51,6 +51,8 @@ static int run(int argc, char** argv) {
         std::printf("fusor  pipeline: gs_solves %ld  gs_late %ld  k_dest end %.3e "
                     "(start %.3e)\n", r.gs_solves, r.gs_late, r.k_dest_end,
                     in.fctx->ref.k_dest_Npm);
+    std::printf("fusor  profile: li_1d %.3f  q0 %.2f  alpha %.2f  sawteeth %ld\n",
+                r.li_end, r.q0_end, r.alpha_end, r.sawteeth);
     std::printf("fusor  %s seed=%llu  H98=%.3f  puff@%.2fs\n", in.s.name.c_str(),
                 (unsigned long long)seed, r.H98_drawn, r.t_puff);
     for (size_t i = 0; i < r.golden.size(); i += 100) {      // print every 1 s

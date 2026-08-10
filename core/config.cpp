@@ -155,6 +155,11 @@ DispersionsCfg load_dispersions(const std::string& path) {
     d.coilR_frac = num(t, "plant_scatter", "coil_R_frac", 0.03);
     d.actlag_frac = num(t, "plant_scatter", "actuator_lag_frac", 0.10);
     if (auto v = t["streams"]["offsets"]["plant"].value<int64_t>()) d.stream_plant = uint32_t(*v);
+    d.hl_lo = num(t, "disturbance_timing", "hl_backtransition_H98", 0.70);   // table form
+    if (auto* tb = t["disturbance_timing"]["hl_backtransition_H98"].as_table()) {
+        d.hl_lo = (*tb)["lo"].value_or(0.70);
+        d.hl_hi = (*tb)["hi"].value_or(0.85);
+    }
     return d;
 }
 
@@ -189,6 +194,12 @@ ScenarioCfg load_scenario(const std::string& path) {
                     s.kick_mm = (*et)["mag_mm"].value_or(25.0);
                     s.kick_t_lo = (*et)["t_lo"].value_or(5.0);
                     s.kick_t_hi = (*et)["t_hi"].value_or(5.0);
+                }
+                if (ty == "hl_backtransition") {           // D-042
+                    s.hl = true;
+                    s.hl_t_lo = (*et)["t_lo"].value_or(4.0);
+                    s.hl_t_hi = (*et)["t_hi"].value_or(6.0);
+                    s.hl_dur_s = (*et)["dur_s"].value_or(1.5);
                 }
             }
         }
