@@ -1,18 +1,19 @@
 # KICKOFF — M1 · the shape and the enemy (bootstrap for the next session)
 
-> **STATUS 2026-08-09 (S7–S11): slices 1, 2a, 2b-1, 3, 4 are DONE and merged** — the
-> enemy (D-035), the verified Δ* core (D-036), the shaped equilibrium (D-037), the
-> MERGE (D-038: k_dest derived, full mutual matrix, γ moving with the equilibrium),
-> and **the FREE BOUNDARY (D-039): the 12-circuit coil set holds the DN separatrix
-> (X-limited, κ_ach 1.85 = the pin, q95 3.68 vs fixed 3.61, imax_frac 0.98); machine
-> pins corrected by the solver-as-fresh-eyes (coil units/positions, κ_shell 1.5→1.9 —
-> γ⁻¹ now 19.9 ms in class); the vde kick re-implemented as the flux-conserving
-> slow-manifold displacement (the teleport rang the regularization artifact — 20/20
-> restored at original kick + gains).** Report-don't-configure holds end-to-end.
-> **Read `docs/HANDOFF_2026-08-09.md`** for the day's map and gotchas (items 1 AND 2
-> are done — SESSION_LOG S11 is the tail of truth; **next: the D-024 pipeline
-> (solve@T applies@T+50, gs_late, coil L-R dynamics in-sim, free-solver k_dest at
-> 200 Hz — ownership pre-registered in D-039) or transport**).
+> **STATUS 2026-08-09 (S7–S12): slices 1, 2a, 2b-1, 3, 4, 5 are DONE and merged** —
+> the enemy (D-035), the Δ* core (D-036), the shaped equilibrium (D-037), the MERGE
+> (D-038), the FREE BOUNDARY (D-039: DN separatrix held by the 12-circuit set;
+> machine pins corrected by the solver-as-fresh-eyes; slow-manifold kick), and **the
+> MODEL-BASED EKF (D-040): 4-state moment-matched Kalman, D-023's information set
+> consumed in full (scatter + contract latencies + coil channel), χ² NIS live —
+> pre-registered [0.5, 2.0], measured [1.27, 1.30]; kicks tokenize 20/20; the
+> resonant-artifact defect found and damped at the source (dance 62→2.2 mm RMS);
+> γ⁻¹ 23.2 ms; first §7.4 datum: vertical+EKF p99.9 = 2.44 µs.** Handoff items 1–3
+> are done — SESSION_LOG S12 is the tail of truth. **Next: the DST/CR fast solver +
+> the D-024 pipeline** (solve@T applies@T+50, gs_late, coil L-R dynamics in-sim,
+> free-solver k_dest at 200 Hz, EKF covariance carry across re-linearizations —
+> ownership pre-registered in D-039/D-040); then transport, diagnostics-into-burn +
+> statecheck fence, the oracle, F-SHAPE-1.
 > The scope list below remains the milestone's full charter.
 
 **Read first, in order:** `CLAUDE.md` → `FUSION_ARCHITECTURE_v0.2.md` **§2.1 tier-1,

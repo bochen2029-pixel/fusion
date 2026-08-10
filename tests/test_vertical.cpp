@@ -3,9 +3,13 @@
 #include "core/sim.h"
 #include "core/vertical.h"
 #include "core/gs.h"
+#include "core/philox.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <chrono>
+#include <vector>
+#include <algorithm>
 
 using namespace fusion;
 
@@ -31,13 +35,13 @@ int main(int argc, char** argv) {
     // the machine pin itself must be adjudicated (a D-entry, never a silent retune)
     if (!(vm.kwall_ > vm.k_dest)) { std::puts("VERTICAL RED: shell cannot hold the shape"); return 1; }
     // the pre-registered CLASS: wall-set 10–100 ms with the shell; removing the shell
-    // makes the mode ≥4× faster (the 20-turn VS still screens passively — reported).
-    // D-039: the bound was 5× under the κ_shell 1.5 vessel; the amended 1.9 shell
-    // (which the DN separatrix REQUIRES) couples more weakly, raising the VS pair's
-    // relative share — measured 4.7×. The demonstration (passive structure sets the
-    // timescale) stands; the ratio moved with the re-pinned machine, receipted.
+    // makes the mode ≥5× faster (the 20-turn VS still screens passively — reported).
+    // D-040 restores the original 5× bound: gamma_open is now the UNDAMPED inertial
+    // reference (the artifact damper is a closed-loop regularization device, excluded
+    // from the no-shell datum); gamma_wall is the sim's actual slow mode, artifact-
+    // damped (+~17% — the regularization's stated, receipted touch on gamma).
     if (!(gi_wall > 0.010 && gi_wall < 0.100)) { std::puts("VERTICAL RED: wall gamma class"); return 1; }
-    if (!(gi_open > 0 && gi_open < 0.008 && gi_wall / gi_open >= 4.0)) {
+    if (!(gi_open > 0 && gi_open < 0.008 && gi_wall / gi_open >= 5.0)) {
         std::puts("VERTICAL RED: shell-removal separation"); return 1; }
 
     // (1b) equilibrium-following demonstration (REPORT-ONLY — the merge's point):
@@ -67,6 +71,72 @@ int main(int argc, char** argv) {
     in.ic = load_innov(root + "/contracts/events.toml");
     in.vd = vd;                     // computed once above; run_sim would re-derive per run
 
+    // ---- DEV budget mode: test_vertical <root> budget — the §7.4 tick-budget datum
+    // (KICKOFF build note: measure the linear step + EKF early, receipt p99.9).
+    // Wall-clock lives HERE, outside run_sim — the sim path stays clock-free.
+    if (argc > 2 && std::string(argv[2]) == "budget") {
+        VerticalModel bm; bm.build(m, vd.k_dest_Npm);
+        VerticalEKF be; be.init(bm, 0.75e-3, 20.0);
+        double xb[VerticalModel::N] = {0}; xb[0] = 1e-3;
+        const int NB = 2000, BATCH = 100;                  // 200k ticks in 100-tick batches
+        std::vector<double> ns_per(NB);
+        for (int b = 0; b < NB; ++b) {
+            const auto t0 = std::chrono::high_resolution_clock::now();
+            for (int i = 0; i < BATCH; ++i) {
+                const double V = -(5e4 * be.xz + 200.0 * be.xv);
+                bm.step_rk4(xb, std::clamp(V, -2000.0, 2000.0), 1e-4);
+                be.predict(V, 1e-4);
+                be.update(xb[0] + 1e-4 * ((i & 7) - 3.5)); // deterministic dither
+                be.update_i(xb[2 + VerticalModel::NP]);
+            }
+            const auto t1 = std::chrono::high_resolution_clock::now();
+            ns_per[b] = std::chrono::duration<double, std::nano>(t1 - t0).count() / BATCH;
+            if (xb[0] > 0.15) { xb[0] = 1e-3; for (int i = 1; i < VerticalModel::N; ++i) xb[i] = 0; }
+        }
+        std::sort(ns_per.begin(), ns_per.end());
+        std::printf("tick budget (vertical step + EKF, batch-of-%d medians): "
+                    "p50 %.0f ns  p99 %.0f ns  p99.9 %.0f ns  (100 us tick)\n",
+                    BATCH, ns_per[NB / 2], ns_per[int(NB * 0.99)], ns_per[NB - 2]);
+        return 0;
+    }
+
+    // ---- DEV trace mode: test_vertical <root> trace <seed> <out.tsv> — replicates
+    // the sim's vertical block (same draws) and dumps the filter's view per tick.
+    if (argc > 4 && std::string(argv[2]) == "trace") {
+        const uint64_t seed = std::strtoull(argv[3], nullptr, 10);
+        VerticalModel pm; pm.build(m, vd.k_dest_Npm, 1.0, 1.0);   // nominal plant here
+        VerticalEKF fe; fe.init(pm, 0.75e-3, 20.0);
+        double xs[VerticalModel::N] = {0}; xs[0] = 3e-3;
+        double zl[2] = {xs[0], xs[0]}, il = 0, bias = 0, Vap = 0, fvlp = 0;
+        const double LPA = 1.0 - std::exp(-2.0 * 3.14159265358979 * 60.0 * 1e-4);
+        FILE* f = std::fopen(argv[4], "wb");
+        std::fprintf(f, "t\tz\tv\txz\txv\tnu\tS\tIvs\txI\tVcmd\n");
+        const uint32_t sid = fnv1a32("vde_kick");
+        for (uint64_t tk = 0; tk < 80000; ++tk) {
+            if (tk == 50000) pm.kick_state(xs, 0.060);
+            fvlp += LPA * (fe.xv - fvlp);
+            const double V = std::clamp(-(5e4 * fe.xz + 200.0 * fvlp), -2000.0, 2000.0);
+            pm.step_rk4(xs, V, 1e-4);
+            Vap = V;
+            const Gauss2 gn = gauss2(seed, 3u, sid, uint32_t(tk));
+            const Gauss2 gi = gauss2(seed, 3u, sid ^ 0x5F375A86u, uint32_t(tk));
+            bias += 3.0e-6 * gn.g1;
+            const double zm = zl[tk % 2] + bias + 0.75e-3 * gn.g0;
+            const double im = il + 20.0 * gi.g0;
+            zl[tk % 2] = xs[0]; il = xs[2 + VerticalModel::NP];
+            fe.predict(Vap, 1e-4);
+            fe.update(zm);
+            fe.update_i(im);
+            if (tk % 5 == 0)
+                std::fprintf(f, "%.4f\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\n",
+                             tk * 1e-4, xs[0], xs[1], fe.xz, fe.xv, fe.innov_last,
+                             fe.S_last, xs[2 + VerticalModel::NP], fe.x[3], Vap);
+        }
+        std::fclose(f);
+        std::printf("trace done: nis_mean %.2f\n", fe.nis_mean());
+        return 0;
+    }
+
     // ---- DEV events mode: test_vertical <root> events <scenario> <gains> <seed...>
     // — dumps the event timeline of chosen seeds (death forensics).
     if (argc > 5 && std::string(argv[2]) == "events") {
@@ -75,8 +145,9 @@ int main(int argc, char** argv) {
         for (int i = 5; i < argc; ++i) {
             const uint64_t seed = std::strtoull(argv[i], nullptr, 10);
             RunResult r = run_sim(in, seed, true);
-            std::printf("seed %llu verdict %u t_end %.3f zmax %.3f events:\n",
-                        (unsigned long long)seed, unsigned(r.verdict), r.t_end, r.z_max_m);
+            std::printf("seed %llu verdict %u t_end %.3f zmax %.3f nis %.2f events:\n",
+                        (unsigned long long)seed, unsigned(r.verdict), r.t_end, r.z_max_m,
+                        r.nis_mean);
             for (const EventRec& e : r.events)
                 std::printf("  t=%8.4f kind=%u arg=%u v0=%.4g v1=%.4g\n",
                             double(e.tick) * 1e-4, unsigned(e.kind), e.arg, e.v0, e.v1);
@@ -137,11 +208,14 @@ int main(int argc, char** argv) {
     std::printf("kick x20: GOOD %d/20  innov-runs %d/20  NIS [%.2f, %.2f]  zmax %.3f m\n",
                 good, innov_runs, nis_lo, nis_hi, zworst);
     if (good < 19) { std::puts("VERTICAL RED: VS null does not hold the kick"); return 1; }
-    if (innov_runs < 10) { std::puts("VERTICAL RED: the innovation gate never tokenized the kick"); return 1; }  // >=10/20: the v0 gate tokenizes kicks that stand above the nulls own limit cycle in ~half the seeds — receipted immaturity, slice 2 owns the calibrated EKF gate (D-035)
-    // Slice-1 consistency: the kinematic tracker's innovation is ELEVATED during real
-    // dynamics by design (that is the seam measuring). Sanity band only; the calibrated
-    // chi^2 NIS acceptance belongs to slice 2's model-based EKF (D-035).
-    if (!(nis_lo > 0.1 && nis_hi < 500.0)) { std::puts("VERTICAL RED: tracker consistency"); return 1; }
+    // D-040: the model-based filter tokenizes EVERY kick (was >=10/20 under the v0
+    // kinematic-tracker gate — D-035's receipted immaturity, now closed).
+    if (innov_runs < 18) { std::puts("VERTICAL RED: the innovation gate missed kicks"); return 1; }
+    // D-023's acceptance, live at last: rolling chi^2 NIS within the pre-registered
+    // band [0.5, 2.0] across plant-scattered seeds — the events.toml sigma-thresholds
+    // only MEAN something while this holds. (Measured 1.27-1.30: scatter + single-mode
+    // reduction + contract latencies, honestly carried by the filter's S.)
+    if (!(nis_lo > 0.5 && nis_hi < 2.0)) { std::puts("VERTICAL RED: EKF chi^2 NIS acceptance"); return 1; }
 
     std::puts("VERTICAL GREEN (the enemy exists, is holdable, dies honestly, and is heard)");
     return 0;

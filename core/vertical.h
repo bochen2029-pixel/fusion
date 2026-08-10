@@ -44,7 +44,16 @@ struct VerticalModel {
                                     // screened fast oscillation sits near F_SCREEN_HZ
                                     // (10 kHz-controllable, EKF-trackable), floored at
                                     // M_EFF_FLOOR; documented, gamma-insensitive (ctest)
-    static constexpr double F_SCREEN_HZ = 180.0, M_EFF_FLOOR = 5.0;
+    static constexpr double F_SCREEN_HZ = 180.0, M_EFF_FLOOR = 5.0, ZETA_SCREEN = 0.7;
+    double d_eff = 0.0;             // N·s/m — the regularization's matching damping
+                                    // (D-040): fake inertia with NO fake damping left
+                                    // the screened artifact RESONANT — the noisy loop
+                                    // pumped it into a 179 Hz, ±60-90 mm standing
+                                    // limit cycle (traced, receipted; S11's "hold"
+                                    // contained the smaller version). ZETA_SCREEN
+                                    // critically damps the artifact BY CONSTRUCTION;
+                                    // the slow mode's gamma shifts ~7% and is, as
+                                    // always, REPORTED from the eigenproblem.
     double k_dest = 0.0;            // N/m — DERIVED input (gs_vertical_derive; D-038)
     double c_p[NP];                 // force per passive ampere = Ip * dM_pj/dZ [N/A]
     double c_vs = 0.0;
@@ -56,6 +65,7 @@ struct VerticalModel {
     double kwall_ = 0.0;             // instantaneous screening stiffness c^T Minv c (rep.)
     double rho_shell = 0.0;          // the calibrated surface-resistivity scalar (rep.)
     double screen_[NC] = {0};        // flux-conserving current pattern per meter (D-039)
+    double tau_wall_used = 0.025;    // the (possibly scattered) vessel tau this build used
     double gamma_open = 0.0;        // reported: no-shell growth rate [1/s] (VS passive)
     double gamma_wall = 0.0;        // reported: with-shell growth rate [1/s]
 
@@ -87,11 +97,17 @@ struct VerticalModel {
         }
     }
 
-    void build(const MachineCfg& m, double k_dest_derived_Npm) {
+    // tw_scale / crs_scale: per-seed plant_scatter truths (dispersions.toml — vessel
+    // time-constant and actuated-circuit-resistance tolerances). The plant is built
+    // SCATTERED; the EKF inits from a NOMINAL build (scales 1) — that gap IS D-023's
+    // pre-registered information-set mismatch, finally consumed (D-040).
+    void build(const MachineCfg& m, double k_dest_derived_Npm,
+               double tw_scale = 1.0, double crs_scale = 1.0) {
         const double PI = 3.14159265358979;
         const double b_sh = m.a * m.b_over_a;               // machine.toml [vessel]
         const double kap_sh = m.kappa_shell;
-        const double tau_w = m.tau_wall_s;
+        const double tau_w = m.tau_wall_s * tw_scale;
+        tau_wall_used = tau_w;
         k_dest = k_dest_derived_Npm;
         // filament ring positions on the shell
         double Rf[NP], Zf[NP];
@@ -154,7 +170,7 @@ struct VerticalModel {
             rho_shell = (uRu > 0) ? uMu / (uRu * tau_w) : 1e-6;   // [ohm per square]
             for (int j = 0; j < NP; ++j) Rcirc[j] = rho_shell * 2.0 * PI * Rf[j] / ds[j];
         }
-        Rcirc[NP] = Rvs;
+        Rcirc[NP] = Rvs * crs_scale;
         // ---- invert the full matrix (Cholesky columns; deterministic) --------------
         {
             std::vector<double> Mlin(NC * NC), Llin(NC * NC), e(NC), col(NC);
@@ -193,9 +209,11 @@ struct VerticalModel {
         const double w_t = 2.0 * PI * F_SCREEN_HZ;
         m_eff = (kwall_ > k_dest) ? std::max(M_EFF_FLOOR, (kwall_ - k_dest) / (w_t * w_t))
                                   : 30.0;
+        d_eff = 2.0 * ZETA_SCREEN * std::sqrt(m_eff * std::max(1e3, kwall_ - k_dest));
         // ---- assemble A: M dI/dt = -R I - c dZ/dt + e_vs Vcmd ----------------------
         for (int i = 0; i < N; ++i) { B[i] = 0; for (int j = 0; j < N; ++j) A[i][j] = 0; }
         A[0][1] = 1.0;
+        A[1][1] = -d_eff / m_eff;
         A[1][0] = k_dest / m_eff;
         for (int j = 0; j < NP; ++j) A[1][2 + j] = c_p[j] / m_eff;
         A[1][2 + NP] = c_vs / m_eff;
@@ -232,10 +250,10 @@ struct VerticalModel {
                     for (int j = 0; j < N; ++j) v += A[i][j] * s[j];
                     d[i] = v;
                 }
-            } else {                                  // [Z, V, I_vs] alone
-                d[0] = s[1];
-                d[1] = (k_dest * s[0] + c_vs * s[2]) / m_eff;
-                d[2] = (-Rvs * s[2] - c_vs * s[1]) / Lvs;
+            } else {                                  // [Z, V, I_vs] alone — the UNDAMPED
+                d[0] = s[1];                          // inertial reference (the artifact
+                d[1] = (k_dest * s[0] + c_vs * s[2]) / m_eff;   // damper is a closed-loop
+                d[2] = (-Rcirc[NP] * s[2] - c_vs * s[1]) / Lvs; // device; excluded here)
             }
         };
         for (long it = 0; it < nsteps; ++it) {
@@ -289,55 +307,199 @@ struct VerticalModel {
     }
 };
 
-// ---- the reduced EKF (D-023: the pre-registered epistemic handicap) ----------------
+// ---- the model-based EKF (D-023 full; D-040 — replaces the slice-1 α-β stand-in) ---
+// A 4-state linear Kalman on the REDUCED vertical model, built from the same DERIVED
+// constants the plant reports (k_dest, kwall, m_eff, tau_wall, c_vs, Lvs, Rvs):
+//   x = [z, v, q_s, I_vs];  q_s = the collective screening mode (internal scale
+//   L_s = 1 H; c_s = sqrt(kwall - c_vs^2/Lvs) so the instantaneous stiffness and the
+//   pinned tau_wall are carried exactly; the 24-filament spectrum's higher harmonics
+//   are the reduction — covered by pre-registered process noise, per the S9 handoff
+//   law: the reduced model must NOT carry raw unstable stiffness on the slow manifold
+//   — and it does not: the slow manifold is IN the model, the tail is in Q).
+// Information set (D-023): NOMINAL constants (the plant is scattered — that gap is
+// the mismatch), the controller's own Vcmd, and ONLY diagnostics.toml channels:
+// z (magnetics: sigma + 2-tick latency, unmodeled bias walk — the filter follows it,
+// stated) and I_vs ([coil_sensors]: 0.2% FS, 1-tick latency). Sequential scalar
+// updates. Discretization: 4th-order series in 4 substeps (Euler was unstable at the
+// screened mode — slice-1's measured lesson; series error ~1e-9 at these eigenvalues).
+// NIS chi^2 on the z channel is the acceptance statistic; the [innovation] gate feeds
+// on the same (nu, S) — the seam's units are finally calibrated sigma.
 struct VerticalEKF {
-    // model: Z'' = (k/m) Z + (c/m) I_vs_cmd_proxy - d V   with 10% param mismatch and
-    // NO passive-current states — the reduction IS the handicap (documented).
-    double xz = 0, xv = 0;
-    double P[2][2] = { {1e-6, 0}, {0, 1e-4} };
-    double k_over_m, c_over_m, damp;
-    double sigma_probe;             // effective probe noise (averaged channels)
+    static constexpr int NS = 4;
+    double x[NS] = {0};
+    double P[NS][NS] = {0};
+    double Phi[NS][NS] = {0}, Bd[NS] = {0};
+    double Qd[NS] = {0};            // diagonal discrete process noise (pre-registered)
+    double Rz = 0, Ri = 0;
+    double xz = 0, xv = 0;          // mirrors of x[0], x[1] (controller taps)
     double nis_sum = 0; long nis_n = 0;
     double innov_last = 0, S_last = 1;
 
-    // Reduced model = the SCREENED oscillator (what the probes actually see at control
-    // timescales), with 10% parameter mismatch — the pre-registered handicap (D-023).
-    // The slow wall-mode drift is carried by process noise, not by the model: that
-    // omission IS the reduction. omega^2 = (k_wall - k_dest)/m, zeta guessed low.
-    void init(const VerticalModel& vm, double probe_sigma_m) {
-        const double w2_true = (vm.kwall_ - vm.k_dest) / vm.m_eff;
-        k_over_m = -0.90 * (w2_true > 0 ? w2_true : 1e4);   // restoring, mismatched
-        c_over_m = 0.90 * vm.c_vs / vm.m_eff;
-        const double w = std::sqrt(w2_true > 0 ? w2_true : 1e4);
-        damp = 2.0 * 0.70 * w;      // heavily damped INTERNAL model: the filter tracks,
-                                    // it does not resonate (the 10 kHz alpha correction
-                                    // supplies the bandwidth; measured fix, receipted)
-        sigma_probe = probe_sigma_m;
+    void init(const VerticalModel& nom, double sigma_z_m, double sigma_i_A) {
+        const double m_ = nom.m_eff, kd = nom.k_dest, cvs = nom.c_vs;
+        const double Lv = nom.Lvs, Rv = nom.Rvs;            // nominal actuated circuit
+        const double kwf = std::max(1e3, nom.kwall_ - cvs * cvs / Lv);
+        const double cs = std::sqrt(kwf);                   // L_s = 1 convention
+        // continuous A, B. The single collective mode is MOMENT-MATCHED: it carries
+        // the exact instantaneous stiffness (cs^2 above), and its decay tau_s is
+        // CALIBRATED so the reduced 4-state's slow pole equals the plant's REPORTED
+        // gamma_wall — the multi-mode spectrum leaks ~1.5x faster than the pinned
+        // tau_wall alone suggests (measured: single-tau gave gamma 34 vs 50 /s and
+        // the filter lagged the growth systematically, NIS ~120 in-loop). Both
+        // numbers are derived from the same NOMINAL model — the information set is
+        // unchanged (D-023). Bisection below is deterministic, fixed count.
+        double A[NS][NS] = {0}, B[NS] = {0};
+        A[0][1] = 1.0;
+        A[1][0] = kd / m_; A[1][1] = -nom.d_eff / m_;
+        A[1][2] = cs / m_; A[1][3] = cvs / m_;
+        A[2][1] = -cs;
+        A[3][1] = -cvs / Lv; A[3][3] = -Rv / Lv;
+        B[3] = 1.0 / Lv;
+        {
+            const double gam_t = nom.gamma_wall > 1.0 ? nom.gamma_wall : 1.0;
+            auto slow_pole = [&](double tau_s) {           // dominant growth of the 4x4
+                A[2][2] = -1.0 / tau_s;
+                double xs[NS] = { 1e-3, 0, 0, 0 };
+                const double dts = 2e-5; const int nst = 15000;   // 0.3 s window
+                double logn = 0, logn_half = 0;
+                for (int it = 0; it < nst; ++it) {
+                    double k1[NS], k2[NS], k3[NS], k4[NS], tt[NS];
+                    auto der = [&](const double* s2, double* d2) {
+                        for (int i = 0; i < NS; ++i) {
+                            double v2 = 0;
+                            for (int j2 = 0; j2 < NS; ++j2) v2 += A[i][j2] * s2[j2];
+                            d2[i] = v2;
+                        }
+                    };
+                    der(xs, k1);
+                    for (int i = 0; i < NS; ++i) tt[i] = xs[i] + 0.5 * dts * k1[i];
+                    der(tt, k2);
+                    for (int i = 0; i < NS; ++i) tt[i] = xs[i] + 0.5 * dts * k2[i];
+                    der(tt, k3);
+                    for (int i = 0; i < NS; ++i) tt[i] = xs[i] + dts * k3[i];
+                    der(tt, k4);
+                    for (int i = 0; i < NS; ++i)
+                        xs[i] += dts / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+                    if ((it & 127) == 127) {
+                        double nr = 0; for (int i = 0; i < NS; ++i) nr += xs[i] * xs[i];
+                        nr = std::sqrt(nr > 0 ? nr : 1e-300);
+                        logn += std::log(nr);
+                        for (int i = 0; i < NS; ++i) xs[i] /= nr;
+                    }
+                    if (it == nst / 2) logn_half = logn;
+                }
+                double nr = 0; for (int i = 0; i < NS; ++i) nr += xs[i] * xs[i];
+                logn += 0.5 * std::log(nr > 0 ? nr : 1e-300);
+                return (logn - logn_half) / (nst * dts * 0.5);
+            };
+            double lo = 0.004, hi = 0.040;                 // gamma decreases with tau_s
+            for (int b = 0; b < 18; ++b) {
+                const double mid = 0.5 * (lo + hi);
+                (slow_pole(mid) > gam_t) ? lo = mid : hi = mid;
+            }
+            A[2][2] = -1.0 / (0.5 * (lo + hi));            // the calibrated mode decay
+        }
+        // discrete Phi, Bd: 4 substeps of the 4th-order series (deterministic)
+        const double dt = 1e-4, h = dt / 4.0;
+        double Ph[NS][NS] = {0}, Bh[NS] = {0};
+        {   // series at h
+            double A2[NS][NS] = {0}, A3[NS][NS] = {0};
+            for (int i = 0; i < NS; ++i)
+                for (int j2 = 0; j2 < NS; ++j2)
+                    for (int k = 0; k < NS; ++k) A2[i][j2] += A[i][k] * A[k][j2];
+            for (int i = 0; i < NS; ++i)
+                for (int j2 = 0; j2 < NS; ++j2)
+                    for (int k = 0; k < NS; ++k) A3[i][j2] += A2[i][k] * A[k][j2];
+            for (int i = 0; i < NS; ++i)
+                for (int j2 = 0; j2 < NS; ++j2)
+                    Ph[i][j2] = (i == j2 ? 1.0 : 0.0) + h * A[i][j2]
+                              + h * h / 2.0 * A2[i][j2] + h * h * h / 6.0 * A3[i][j2];
+            for (int i = 0; i < NS; ++i)
+                Bh[i] = h * B[i] + h * h / 2.0 * (A[i][3] * B[3])
+                      + h * h * h / 6.0 * (A2[i][3] * B[3]);
+        }
+        // compose 4 substeps: Phi = Ph^4, Bd = (Ph^3 + Ph^2 + Ph + I) Bh
+        double P2[NS][NS] = {0}, P3[NS][NS] = {0};
+        for (int i = 0; i < NS; ++i)
+            for (int j2 = 0; j2 < NS; ++j2)
+                for (int k = 0; k < NS; ++k) P2[i][j2] += Ph[i][k] * Ph[k][j2];
+        for (int i = 0; i < NS; ++i)
+            for (int j2 = 0; j2 < NS; ++j2)
+                for (int k = 0; k < NS; ++k) P3[i][j2] += P2[i][k] * Ph[k][j2];
+        for (int i = 0; i < NS; ++i)
+            for (int j2 = 0; j2 < NS; ++j2) {
+                Phi[i][j2] = 0;
+                for (int k = 0; k < NS; ++k) Phi[i][j2] += P2[i][k] * P2[k][j2];
+            }
+        for (int i = 0; i < NS; ++i) {
+            Bd[i] = Bh[i];
+            for (int j2 = 0; j2 < NS; ++j2)
+                Bd[i] += (Ph[i][j2] + P2[i][j2] + P3[i][j2]) * Bh[j2];
+        }
+        // pre-registered noise (calibrated ONCE on nominal seeds, frozen — receipted):
+        // q_v covers the mode-spectrum reduction as force noise — the single collective
+        // mode mislocates the FAST (artifact) frequency by O(10-30%), and in closed
+        // loop the noise-pumped artifact makes that the dominant innovation source
+        // (measured: NIS 2 as observer, ~200 in-loop at sigma_a 300); sigma_a is set
+        // to the unmodeled-artifact acceleration scale ~ 0.2*omega^2*z_dance. q_qs
+        // covers the mode amplitude, q_i the drive/resistance tolerance.
+        Qd[0] = 1e-12;
+        Qd[1] = (3000.0 * dt) * (3000.0 * dt);
+        Qd[2] = (0.2 * cs * 0.3 * dt) * (0.2 * cs * 0.3 * dt);
+        Qd[3] = (1.5e4 * dt) * (1.5e4 * dt);
+        Rz = sigma_z_m * sigma_z_m;
+        Ri = sigma_i_A * sigma_i_A;
+        for (int i = 0; i < NS; ++i)
+            for (int j2 = 0; j2 < NS; ++j2) P[i][j2] = 0;
+        P[0][0] = 9e-6; P[1][1] = 1e-2; P[2][2] = 1e2; P[3][3] = 1e4;
+        for (int i = 0; i < NS; ++i) x[i] = 0;
+        xz = xv = 0;
     }
-    // SLICE-1 REDUCTION (documented, D-035): a FIXED-GAIN steady-state filter (alpha-
-    // beta tracker = the steady-state Kalman of this measurement geometry). The full
-    // adaptive EKF with covariance propagation + chi^2 NIS acceptance is the M1-full
-    // deliverable, built on the GS-linearized model (slice 2). The hand-rolled 2x2
-    // covariance propagation was Euler-unstable at the screened-mode frequency —
-    // measured, receipted, replaced.
-    // KINEMATIC predict (constant velocity — no plant model at all): the maximal
-    // pre-registered handicap. The stiffness model whipped xv on the slow wall-mode
-    // manifold (true quasi-static accel ~0 vs modeled -k*Z — measured, receipted);
-    // slice 2's EKF gets the GS-linearized model + the D-023 information-set doctrine.
-    void predict(double Ivs, double dt) {
-        xz += dt * xv;
-        (void)Ivs;
+
+    void predict(double Vcmd, double dt_unused) {
+        (void)dt_unused;                                    // Phi is pinned at 1e-4
+        double xn[NS] = {0};
+        for (int i = 0; i < NS; ++i) {
+            for (int j2 = 0; j2 < NS; ++j2) xn[i] += Phi[i][j2] * x[j2];
+            xn[i] += Bd[i] * Vcmd;
+        }
+        for (int i = 0; i < NS; ++i) x[i] = xn[i];
+        double PP[NS][NS] = {0};
+        for (int i = 0; i < NS; ++i)                        // P = Phi P Phi^T + Q
+            for (int j2 = 0; j2 < NS; ++j2) {
+                double s = 0;
+                for (int k = 0; k < NS; ++k) s += Phi[i][k] * P[k][j2];
+                PP[i][j2] = s;
+            }
+        for (int i = 0; i < NS; ++i)
+            for (int j2 = 0; j2 < NS; ++j2) {
+                double s = 0;
+                for (int k = 0; k < NS; ++k) s += PP[i][k] * Phi[j2][k];
+                P[i][j2] = s + (i == j2 ? Qd[i] : 0.0);
+            }
+        xz = x[0]; xv = x[1];
     }
-    void update(double z_meas) {
-        const double alpha = 0.45, beta = 0.08, dt = 1e-4;
-        const double nu = z_meas - xz;
-        const double S = sigma_probe * sigma_probe * 2.5;   // fixed consistency scale
-        innov_last = nu; S_last = S;
-        nis_sum += nu * nu / S; ++nis_n;
-        xz += alpha * nu;
-        xv += 50.0 * nu;            // velocity correction (beta_canon ~ 5e-3 at 10 kHz)
-        (void)beta; (void)dt;
+    void scalar_update(int row, double meas, double Rm, bool count_nis) {
+        const double nu = meas - x[row];
+        const double S = P[row][row] + Rm;
+        if (count_nis) {
+            innov_last = nu; S_last = S;
+            nis_sum += nu * nu / S; ++nis_n;
+        }
+        double K[NS];
+        for (int i = 0; i < NS; ++i) K[i] = P[i][row] / S;
+        for (int i = 0; i < NS; ++i) x[i] += K[i] * nu;
+        double Pn[NS][NS];
+        for (int i = 0; i < NS; ++i)                        // (I - K H) P, symmetrized
+            for (int j2 = 0; j2 < NS; ++j2)
+                Pn[i][j2] = P[i][j2] - K[i] * P[row][j2];
+        for (int i = 0; i < NS; ++i)
+            for (int j2 = 0; j2 < NS; ++j2)
+                P[i][j2] = 0.5 * (Pn[i][j2] + Pn[j2][i]);
+        xz = x[0]; xv = x[1];
     }
+    void update(double z_meas) { scalar_update(0, z_meas, Rz, true); }   // magnetics
+    void update_i(double i_meas) { scalar_update(3, i_meas, Ri, false); } // coil sensor
     double nis_mean() const { return nis_n ? nis_sum / double(nis_n) : 0.0; }
 };
 
