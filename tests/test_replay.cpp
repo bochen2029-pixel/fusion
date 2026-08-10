@@ -58,6 +58,31 @@ int main(int argc, char** argv) {
     }
     std::printf("replay rampdown 4242: fnv %016llx  gs_solves %ld  gs_late %ld  OK\n",
                 (unsigned long long)ra.fnv, ra.gs_solves, ra.gs_late);
+
+    // D-046 (S17a): the gs_late ANGER TEST — prove the pipeline's late path fires and
+    // COUNTS DETERMINISTICALLY (F-KEEPUP-F will lean on it; FORWARD_NOTES_M2 §5). The
+    // 60 mm vde_kick forces exactly one mid-flight revalidation collision at the kick
+    // tick (measured); tightening reval_bound_m makes MORE fire — both bit-stable.
+    in.s = load_scenario(root + "/contracts/scenarios/vde_kick.toml");
+    in.fctx = gs_free_context(in.m);
+    RunResult ga = run_sim(in, 100, true);
+    RunResult gb = run_sim(in, 100, true);
+    if (ga.fnv != gb.fnv || ga.gs_late != gb.gs_late || ga.gs_solves != gb.gs_solves) {
+        std::fprintf(stderr, "REPLAY ORACLE RED: vde_kick gs_late replay diverged\n"); return 1; }
+    if (ga.gs_late < 1) {
+        std::fprintf(stderr, "REPLAY ORACLE RED: the kick did not fire gs_late (late path dead)\n");
+        return 1; }
+    SimInputs in_tight = in; in_tight.reval_bound_m = 0.002;   // 2 mm: force many
+    RunResult ta = run_sim(in_tight, 100, true);
+    RunResult tb = run_sim(in_tight, 100, true);
+    if (ta.fnv != tb.fnv || ta.gs_late != tb.gs_late) {
+        std::fprintf(stderr, "REPLAY ORACLE RED: tight-bound gs_late replay diverged\n"); return 1; }
+    if (!(ta.gs_late > ga.gs_late)) {
+        std::fprintf(stderr, "REPLAY ORACLE RED: tightening reval_bound did not raise gs_late "
+                     "(%ld vs %ld)\n", ta.gs_late, ga.gs_late); return 1; }
+    std::printf("gs_late anger: vde_kick 100 bound 20mm -> %ld late (fnv %016llx); "
+                "bound 2mm -> %ld late — both bit-stable  OK\n",
+                ga.gs_late, (unsigned long long)ga.fnv, ta.gs_late);
     std::puts("REPLAY ORACLE GREEN");
     return 0;
 }

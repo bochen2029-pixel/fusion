@@ -15,7 +15,10 @@ namespace fusion {
 struct BurnObs {
     double T_meas_keV;      // ECE core chord, cross-calibrated (constant from init cal)
     double n_meas;          // interferometer line/volume average [m^-3]
-    double prad_meas_W;     // bolometric sum (tier-1: noise-free channel, stated)
+    double prad_meas_W;     // bolometric sum (diagnostics.toml [bolometer]: noisy +
+                            // 1-sub-cycle latency since M2 S17a/D-046; the null runs
+                            // Krad=0 so it is honest-but-inert here — a rad-using
+                            // controller eats the noise)
     double paux_state_W;    // the actuator's own reported state (drive electronics)
     double T_set_keV, n_set_e20;
     bool   heat_permit;     // spine signal: false after a vde gate fired

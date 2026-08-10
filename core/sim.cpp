@@ -94,6 +94,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     PolicyState pst{};
     pst.paux_cmd_prev_W = s.Paux;
     pst.prad_avg_W = d.Prad;                     // 5 s EMA — the rad-ff baseline (D-033)
+    double prad_obs_prev = d.Prad;               // D-046: bolometer latch (1 sub-cycle)
 
     enum Mode : uint32_t { RUN = 0, TQ = 2, CQ = 3 };
     uint32_t mode = RUN;
@@ -129,6 +130,13 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     double z_sq_sum = 0.0; uint64_t z_sq_n = 0;      // D-045: z_rms settled window
     double z_int_acc = 0.0, z_peak_acc = 0.0;        // D-044c smoothness window
     double v_eff_sum = 0.0; uint64_t v_eff_n = 0;    // VS effort (objective term)
+    // D-046 (S17a): the observer's Ip is a rogowski-noised, EMA-smoothed channel
+    // (diagnostics.toml [rogowski]) — the D-041 "noise-free at tier-1, stated"
+    // simplification removed. The PLANT's Ip stays truth (vmod.retune, track_step);
+    // ONLY the observer relink (vnom.retune) reads this. Init at the plant's Ip below.
+    double ip_obs_ema = 0.0;
+    const double ROGO_SIGMA = 0.005;                 // diagnostics.toml [rogowski]
+    const double ROGO_EMA_A = 1.0 - std::exp(-DT_TICK / (10.0e-3));   // tau_ema_ms 10
     const InnovCfg icfg = in.ic;       // events.toml [innovation], loaded by the caller
     // D-041: the free-boundary equilibrium is the RUNTIME k_dest source (D-039's
     // pre-registered rewiring; the fixed-boundary derive is now the verification
@@ -156,6 +164,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
         r.gamma_wall = vmod.gamma_wall; r.gamma_open = vmod.gamma_open;
         xvert[0] = in.d.z0_mm * 1e-3 * b1.g1;              // the drawn z0 jitter, at last
         z_solve_ref = xvert[0];
+        ip_obs_ema = s.Ip;                                 // D-046: observer Ip seed = truth
         vnom.build(m, vd_now.k_dest_Npm);
         vekf.init(vnom, 0.75e-3, 20.0);       // magnetics 4-probe avg; coil 0.2% of 10 kA
         zlat[0] = zlat[1] = xvert[0]; ilat[0] = 0.0;
@@ -174,6 +183,17 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
 
         // ---- vertical channel, per tick (10 kHz control + EKF + innovation gate) ----
         if (sc.vert_on && mode == RUN) {
+            // D-046: the observer's rogowski Ip — noised off the TRUTH s.Ip, EMA-smoothed
+            // (diagnostics.toml [rogowski]). Drawn every tick (stream 3, own counter key)
+            // so the EMA is well-defined; consumed only at the observer relink (below).
+            // The plant's Ip is never touched (physics). Own Philox key => existing draws
+            // bit-identical (golden-safe; easy has vert_on=false anyway).
+            {
+                const Gauss2 gr = gauss2(seed, 3u, sc.scenario_id ^ 0x0F0517C0u,
+                                        uint32_t(tick & 0xFFFFFFFFu));
+                const double ip_rogo = s.Ip * (1.0 + ROGO_SIGMA * gr.g0);
+                ip_obs_ema += ROGO_EMA_A * (ip_rogo - ip_obs_ema);
+            }
             // ---- the D-024 pipeline (D-041): solve@T applies@T+50 (200 Hz slots);
             // |dZ| beyond the linearization bound forces an early re-solve; a request
             // hitting an in-flight solve is a gs_late event (deterministic surrogate
@@ -187,17 +207,19 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
                 if (tick == pipe_apply) {
                     pipe_apply = ~0ull;
                     // observer re-linearization at apply; x and P CARRY (D-023 clause).
-                    // The observer's Ip is the MEASURED plasma current (rogowski-class;
-                    // noise-free at tier-1, stated — D-041): the plant retunes with the
-                    // same s.Ip, so the coupling gap is the tracked-k_dest residual,
-                    // not a standing 2% jitter offset (which the loop pumped at the
-                    // artifact frequency — measured, receipted).
-                    vnom.retune(s.Ip, vd_pend.k_dest_Npm);
+                    // D-046: the observer's Ip is the ROGOWSKI channel (noised off truth,
+                    // EMA-smoothed — diagnostics.toml [rogowski]); D-041's "noise-free at
+                    // tier-1, stated" simplification is removed. The plant retunes with
+                    // truth s.Ip, so the coupling gap is now the tracked-k_dest residual
+                    // PLUS the rogowski error the filter must ride (the honest observer
+                    // handicap, D-023). k_dest stays the tracking-solve (rtEFIT) value —
+                    // that solve is not noised in v1 (the deferred harder-world variant).
+                    vnom.retune(ip_obs_ema, vd_pend.k_dest_Npm);
                     vekf.relink(vnom);
                     r.k_dest_end = vd_pend.k_dest_Npm;
                 }
                 const bool slot = (tick % 50) == 0;
-                const bool revalidate = std::fabs(xvert[0] - z_solve_ref) > 0.020;
+                const bool revalidate = std::fabs(xvert[0] - z_solve_ref) > in.reval_bound_m;
                 const bool inflight = pipe_apply != ~0ull;
                 if (slot || revalidate) {
                     if (inflight) {
@@ -332,8 +354,15 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
                                      uint32_t((tick / SUBCYCLE) & 0xFFFFFFFFu));
             const double T_obs = (T_obs_prev / ece_cal) * (1.0 + 0.03 * gd.g0);
             const double n_obs = n_obs_prev + 0.03e20 * gd.g1;
+            // D-046: the bolometer channel (diagnostics.toml [bolometer]) — own Philox
+            // key (independent of the ECE/interferometer draw), 1-sub-cycle latch. The
+            // null runs Krad=0 so prad_meas does not reach the command (honest-but-inert);
+            // wired now so a rad-using controller (or the net) eats the real noise.
+            const Gauss2 gb = gauss2(seed, 3u, sc.scenario_id ^ 0xB0105011u,
+                                     uint32_t((tick / SUBCYCLE) & 0xFFFFFFFFu));
+            const double prad_obs = prad_obs_prev * (1.0 + 0.05 * gb.g0);
             // ---- the null controller (1 kHz), BEHIND THE FENCE (D-043) ----
-            const BurnObs bo{ T_obs, n_obs, d.Prad, s.Paux,
+            const BurnObs bo{ T_obs, n_obs, prad_obs, s.Paux,
                               sc.T_set_keV, sc.n_set_e20, !vde_gate_fired };
             const BurnCmd bc = policy_burn(bo, k, m, pst, dt_pid);
             c.Paux_cmd = bc.Paux_cmd_W;
@@ -409,6 +438,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             d.Q = d.Pfus / std::max(s.Paux, 0.5e6);
             // diagnostics latch (one-sub-cycle latency; ECE cross-cal frozen at init)
             T_obs_prev = io.T_core; n_obs_prev = io.nbar;
+            prad_obs_prev = io.Prad_W;                    // D-046: bolometer latch
 
             // ---- spine gates + terminal physics (per burn step; dwell in ticks) ----
             // quench_precursor: f_rad > 1.0 dwell, OR T halves in 2 ms (predicate mirror)

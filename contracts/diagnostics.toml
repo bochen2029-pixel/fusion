@@ -39,3 +39,23 @@ latency_ticks = 1
 rate_khz      = 1.0
 sigma_frac    = 0.03
 latency_ticks = 10
+
+[bolometer]         # total radiated power, foil-bolometer array SUM — the burn
+                    # controller's radiation channel (the D-033 rad-ff input). M2 S17a
+                    # (D-046) promoted the tier-1 "reads true Prad, noise-free, stated"
+                    # simplification (obs.h) to a real noisy channel. Foils integrate
+                    # thermally -> noisier than magnetics. The shipped null runs Krad=0
+                    # (D-033's hot-hold zeroed it), so this channel is HONEST-but-inert
+                    # for the null; a controller that uses radiation eats the noise.
+rate_khz      = 1.0
+sigma_frac    = 0.05       # per-sample, of the radiated-power sum
+latency_ticks = 10         # 1 burn sub-cycle (mirrors ECE; folded into the rad-ff EMA)
+
+[rogowski]          # plasma current, integrated b_theta loop — the OBSERVER's Ip. The
+                    # PLANT's Ip stays truth (physics; the retune + the tracking solve
+                    # both read s.Ip). M2 S17a (D-046): the observer's relink Ip is this
+                    # noisy channel, EMA-smoothed. The tracking (rtEFIT-class) solve is
+                    # NOT noised in v1 (a deliberately-deferred harder-world variant).
+sigma_frac    = 0.005      # per-sample, of Ip (rogowski is the primary Ip diagnostic)
+tau_ema_ms    = 10.0       # observer smoothing time constant
+latency_ticks = 2

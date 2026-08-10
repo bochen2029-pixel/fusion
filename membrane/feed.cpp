@@ -1,6 +1,7 @@
 // membrane/feed.cpp — the event tokenizer's text side (vocabulary per contracts/events.toml).
 #include "membrane/feed.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 
@@ -50,6 +51,18 @@ std::vector<FeedLine> render_feed(const RunResult& r, double scale, long long t0
                 L.lane = "plant"; L.text = fmt("terminal current_quench tau_cq=%.1fms Ip=%.1fMA", e.v0, e.v1); break;
             case EvKind::TerminalDisrupt:
                 L.lane = "plant"; L.text = fmt("terminal disrupt t=%.2fs Ip->%.1fMA — the run is over", e.v0, e.v1); break;
+            // M2 S17a (D-046): the tier-1 event kinds the renderer had been silently
+            // dropping (FORWARD_NOTES_M2 §5 — the tokenizer's diet is the thesis, don't
+            // starve it). v0/v1 per the plant's ev() calls in core/sim.cpp.
+            case EvKind::GsLate:                          // sys lane (spec §4 bus lanes)
+                L.lane = "sys";
+                L.text = fmt("organ gs_late: revalidation unserved |dZ|=%.1fmm, solve in flight",
+                             std::fabs(e.v0 - e.v1) * 1000.0);
+                break;
+            case EvKind::Sawtooth:
+                L.lane = "plant"; L.text = fmt("sawtooth crash q0=%.2f alpha->%.2f", e.v0, e.v1); break;
+            case EvKind::HLBack:
+                L.lane = "plant"; L.text = fmt("H->L back-transition H98->%.2f at t=%.1fs — confinement drop", e.v0, e.v1); break;
         }
         if (!L.text.empty()) out.push_back(std::move(L));
     }

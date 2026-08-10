@@ -79,6 +79,12 @@ struct SimInputs {
                                     // demand when unset (correct, ~2 s — single runs).
     const char* trace_path = nullptr;   // DEV-ONLY: per-tick vertical TSV (forensics;
                                     // file I/O in the loop — never set in gates/MC)
+    double reval_bound_m = 0.020;   // D-024 pipeline: |dZ| beyond this forces an early
+                                    // re-solve; a request hitting an in-flight solve is
+                                    // a gs_late event. Default = the shipped bound (2 cm,
+                                    // D-041); the gs_late anger test (D-046) tightens it
+                                    // to prove the late path fires and counts
+                                    // deterministically. Golden-safe: default unchanged.
 };
 
 RunResult run_sim(const SimInputs& in, uint64_t seed, bool record);

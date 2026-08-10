@@ -45,6 +45,12 @@ add_executable(test_gs tests/test_gs.cpp)
 target_link_libraries(test_gs PRIVATE fusion_core)
 add_test(NAME gs_solver COMMAND test_gs ${CMAKE_SOURCE_DIR})
 
+# M2 S17a (D-046): the renderer must not silently drop event kinds (feed.cpp needs no
+# llama — render_feed is pure). Guards the tokenizer's diet (FORWARD_NOTES_M2 §5).
+add_executable(test_feed tests/test_feed.cpp membrane/feed.cpp)
+target_link_libraries(test_feed PRIVATE fusion_core)
+add_test(NAME feed_render COMMAND test_feed)
+
 # ---- M0.5: fusor_shadow — the thesis-slice triple (llama.cpp in-process, delay-loaded
 # from C:/llama.cpp at runtime; import libs vendored — auricle's proven pattern)
 set(LLAMA_TP ${CMAKE_SOURCE_DIR}/third_party/llama.cpp)

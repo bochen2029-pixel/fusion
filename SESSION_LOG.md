@@ -532,3 +532,47 @@ per-seed trajectory oracle, no hardened curriculum. The LQ schedule is k_dest-on
 channels, gs_late anger test, renderer EvKinds 9–11 — then S17b's failure curves +
 curriculum-freeze D-entry (the null's knee measured on eval seeds BEFORE any training),
 then S18 (fusor_train_env + SimEnv bit-identity + ghost PoC). Branch `m2-cerebellum`.
+
+---
+
+## S17a · 2026-08-10 · M2 — the world-freeze (partial-commit; M2 open)
+
+**Done (branch `m2-cerebellum`; receipt `runs/m2s1a-worldfreeze-2026-08-10.md` +
+`runs/m2s1/refreceipt_worldfreeze.txt`; D-046):** the last observation-world changes
+before any failure-curve measurement (S14's law: any obs-world change moves
+trajectories — so land them all, THEN freeze, THEN measure curves). Four changes:
+(a) **the bolometer channel** (`diagnostics.toml [bolometer]`; obs.h) — the tier-1
+"true Prad, noise-free, stated" simplification removed; the burn rad-ff input is a
+noisy (σ 5%), latched bolometric sum on its own Philox key. The null runs Krad=0 so
+it is HONEST-BUT-INERT (proven live at Krad=0.5: easy cost 2.678→2.656); easy goldens
+BIT-IDENTICAL. (b) **rogowski noise on the OBSERVER's Ip** (`[rogowski]`, σ 0.5%, EMA
+τ 10 ms) — the relink reads it; the plant's Ip and the rtEFIT tracking solve stay
+truth (relay Q20). ~0.035% at relink; NIS holds [1.29,1.40]. (c) **the gs_late anger
+test** (`SimInputs.reval_bound_m`) — the 60 mm kick fires exactly 1 mid-flight
+collision (fnv-stable), a 2 mm bound fires 5; the late path proven to fire+count
+deterministically before F-KEEPUP leans on it. (d) **renderer EvKinds 9–11**
+(`membrane/feed.cpp`) — GsLate/Sawtooth/HLBack were silently dropped; now rendered
+(GsLate on `sys`, per spec §4), guarded by a new **`feed_render`** ctest. ctest 8/8 →
+**9/9**; golden/replay/statecheck/NIS all green.
+
+**Measured (eval seeds 800000:800100, N=100; re-receipt on the changed world):**
+**100/100 both arms × all four scenarios**, matching S16 to <1% (the world change is
+honest but small — bolometer inert, rogowski EMA-tiny); the live deltas confirm the
+channel (rampdown PD worst-seed NIS 102.71→102.1; vde_kick LQ z_int 0.00273→0.002734).
+The LQ's dominance over the PD is intact (3.5–16× less VS effort, clean NIS).
+
+**Null result (DoD 3):** unchanged — the composite null (PID+LQ, `gains_m2.toml`) is
+the shipping baseline; the world it lives in is now the honest one (noisy radiation +
+current channels), and it still holds.
+
+**Honest state:** M2 OPEN. The observation world is FROZEN (all channels honest, the
+renderer complete, the late path proven, determinism intact). No failure curves yet,
+no hardened curriculum, no trained arm. Deferred-stated: the diagnostics.toml→loaded
+DiagnosticsCfg unification (channels are still hardcoded contract-mirrors), the
+tracking-solve rogowski variant.
+
+**Next (S17b): the failure curves + the curriculum-freeze D-entry** — the null's knee
+measured on EVAL seeds (kick psychometric sweep, combined events, the deep
+lethal-legal), pre-registered target bands, the hardened F-NULL-C grid frozen BEFORE
+any training (relay §2/§3). Then S18 (fusor_train_env + SimEnv bit-identity + ghost
+PoC). Branch `m2-cerebellum`.

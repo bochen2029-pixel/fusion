@@ -518,3 +518,43 @@ cross-session with the operator ratifying.*
   bit-identical — golden fnv unmoved); gains_m2.toml is the new default, gains_m0.toml
   (PD) retained runtime-selectable. The hollow-win-vs-a-limit-cycling-PD path is now
   closed: F-NULL-C's net must beat a near-minimal-effort, clean-lane baseline.
+- **D-046 · 2026-08-10 · M2 slice S17a — the world-freeze (the last observation-world
+  changes before any failure-curve measurement; relay Q9/Q20/Q23).** S14's lesson made
+  law: ANY observation-world change moves trajectories, so all of them land BEFORE the
+  curves; then the world is frozen and every curve is measured on a stable world. Four
+  changes: (a) **the bolometer channel** (`diagnostics.toml [bolometer]`; obs.h
+  BurnObs.prad_meas_W) — the D-041/tier-1 "reads true Prad, noise-free, stated"
+  simplification is REMOVED; the burn controller's radiation input is now a noisy
+  (sigma 5%), 1-sub-cycle-latched bolometric sum on its own Philox key. The shipped
+  null runs Krad=0 (D-033's hot-hold zeroed the rad-ff), so the channel is
+  **honest-but-inert for the null** — wired now so a rad-using controller or the net
+  eats the real noise; because Krad=0 and the draw has an independent counter key, the
+  easy tier-0 goldens are BIT-IDENTICAL (golden_check green). (b) **Rogowski noise on
+  the OBSERVER's Ip** (`diagnostics.toml [rogowski]`; sigma 0.5%, EMA tau 10 ms) — the
+  observer relink (`vnom.retune`) reads this smoothed noisy channel instead of truth
+  s.Ip; the PLANT's Ip stays truth (vmod.retune) and the rtEFIT-class TRACKING solve is
+  NOT noised in v1 (the deferred harder-world variant, per relay Q20). Measured: the
+  EMA-smoothed perturbation is ~0.035% at the 5 ms relink cadence, below the
+  scatter/reduction/latency NIS floor — **NIS holds [1.29,1.40], kicks 20/20** (the
+  channel is honest and now feeds the net's future raw-Ip feature; its dynamical effect
+  on the current PD/LQ is deliberately small by the EMA design). (c) **The gs_late anger
+  test** (`SimInputs.reval_bound_m`, default 0.020 = the shipped 2 cm bound so behavior
+  is unchanged; the test tightens it) — the 60 mm vde_kick forces exactly ONE mid-flight
+  revalidation collision at the kick tick (measured: gs_late=1, fnv-stable); at a 2 mm
+  bound, 5 fire — both bit-stable. The late path is proven to FIRE and COUNT
+  deterministically before F-KEEPUP-F leans on it (FORWARD_NOTES_M2 §5; the "never fired
+  in anger" note referred to the healthy/ramp scenarios — the kick always exercised it,
+  just never asserted). Registered in the replay oracle. (d) **Renderer EvKinds 9–11**
+  (membrane/feed.cpp) — GsLate/Sawtooth/HLBack were being SILENTLY DROPPED (empty text,
+  skipped); now rendered (GsLate on the `sys` lane per spec §4, Sawtooth/HLBack on
+  `plant`), guarded by a new `feed_render` ctest that asserts every vocabulary event
+  kind produces a non-empty line (the tokenizer's-diet regression guard — the diet is
+  the thesis, M-M11). ctest 8/8 -> **9/9**. **The null re-receipted on the changed
+  world (eval seeds 800000:800100, N=100): 100/100 both arms x all four scenarios,
+  matching S16 to <1%** (bolometer inert at Krad=0; rogowski ~0.035% by the EMA design);
+  the live-but-small deltas confirm the channel (rampdown PD worst-seed NIS 102.71 ->
+  102.1). The LQ's dominance over the PD is intact. Bolometer wiring proven live (a
+  Krad=0.5 controller shifts easy cost 2.678 -> 2.656). Deferred (stated, not silent):
+  the diagnostics.toml -> loaded-DiagnosticsCfg unification (all channels are still
+  hardcoded-mirrors of the contract, the pre-existing convention; a future cleanup),
+  and the tracking-solve rogowski variant.
