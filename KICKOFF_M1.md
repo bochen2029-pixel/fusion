@@ -9,11 +9,16 @@
 > pre-registered [0.5, 2.0], measured [1.27, 1.30]; kicks tokenize 20/20; the
 > resonant-artifact defect found and damped at the source (dance 62→2.2 mm RMS);
 > γ⁻¹ 23.2 ms; first §7.4 datum: vertical+EKF p99.9 = 2.44 µs.** Handoff items 1–3
-> are done — SESSION_LOG S12 is the tail of truth. **Next: the DST/CR fast solver +
-> the D-024 pipeline** (solve@T applies@T+50, gs_late, coil L-R dynamics in-sim,
-> free-solver k_dest at 200 Hz, EKF covariance carry across re-linearizations —
-> ownership pre-registered in D-039/D-040); then transport, diagnostics-into-burn +
-> statecheck fence, the oracle, F-SHAPE-1.
+> are done, and **slice 6 (D-041) landed the DST direct solver + the D-024 pipeline:
+> the free-boundary equilibrium is the RUNTIME k_dest source, tracked at 200 Hz
+> (solve@T applies@T+50, gs_late, ΔZ revalidation), plant retuned per tick, observer
+> re-linearized with the Jacobian x/P carry; rampdown.toml is the first moving-
+> equilibrium scenario (k_dest −6.8% tracked, 0 late, 20/20 GOOD, replay bit-stable);
+> the artifact is now OVERDAMPED (ζ 1.2 — the off-design-point pumping fix);
+> §7.4 vertical+EKF p99.9 = 3.78 µs.** SESSION_LOG S13 is the tail of truth.
+> **Next: transport (l_i movement — the deep lethal-legal lever) + diagnostics into
+> the burn loop + the statecheck fence, or the oracle (owns rampdown ≥95% + the
+> curriculum) — then F-SHAPE-1.**
 > The scope list below remains the milestone's full charter.
 
 **Read first, in order:** `CLAUDE.md` → `FUSION_ARCHITECTURE_v0.2.md` **§2.1 tier-1,

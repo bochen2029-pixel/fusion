@@ -195,6 +195,14 @@ ScenarioCfg load_scenario(const std::string& path) {
     }
     s.vert_on = t["vertical"]["enabled"].value_or(false);
     s.vs_on = t["vertical"]["vs_on"].value_or(true);
+    if (t.contains("ramp")) {                        // D-041 schema addition
+        s.ramp = true;
+        s.ramp_ip_end_MA = num(t, "ramp", "ip_end_MA", s.Ip_MA);
+        s.ramp_t0 = num(t, "ramp", "t_start_s", 0.0);
+        s.ramp_t1 = num(t, "ramp", "t_end_s", 0.0);
+        if (s.ramp_t1 <= s.ramp_t0)
+            throw std::runtime_error("scenario [ramp]: t_end_s must exceed t_start_s");
+    }
     s.scenario_id = fnv1a32(s.name);
     return s;
 }

@@ -2,6 +2,7 @@
 // fusor --root <repo> --scenario <path> [--seed N] [--gains <path>]
 #include "core/sim.h"
 #include "core/gs.h"
+#include "core/gs_free.h"
 #include "core/philox.h"
 #include "core/physics_tier0.h"
 #include <cstdio>
@@ -39,12 +40,17 @@ static int run(int argc, char** argv) {
                               : load_gains(gains_path);
     in.ic = load_innov(root + "/contracts/events.toml");
     if (in.s.vert_on) {
-        in.vd = gs_vertical_derive(in.m);                 // the MERGE (D-038)
-        std::printf("fusor  equilibrium-derived: n_decay %.3f  Bz_ext %.3f T  "
-                    "k_dest %.3e N/m\n", in.vd.n_decay, in.vd.Bz_ext_axis_T,
-                    in.vd.k_dest_Npm);
+        in.fctx = gs_free_context(in.m);                  // the runtime source (D-041)
+        std::printf("fusor  free-boundary: n_decay %.3f  Bz_ext %.3f T  k_dest %.3e "
+                    "N/m  q95 %.2f  X(%.3f,+-%.3f)\n", in.fctx->ref.n_decay,
+                    in.fctx->ref.Bz_ext_axis_T, in.fctx->ref.k_dest_Npm,
+                    in.fctx->ref.q95, in.fctx->ref.Rx, in.fctx->ref.Zx);
     }
     RunResult r = run_sim(in, seed, true);
+    if (in.s.vert_on)
+        std::printf("fusor  pipeline: gs_solves %ld  gs_late %ld  k_dest end %.3e "
+                    "(start %.3e)\n", r.gs_solves, r.gs_late, r.k_dest_end,
+                    in.fctx->ref.k_dest_Npm);
     std::printf("fusor  %s seed=%llu  H98=%.3f  puff@%.2fs\n", in.s.name.c_str(),
                 (unsigned long long)seed, r.H98_drawn, r.t_puff);
     for (size_t i = 0; i < r.golden.size(); i += 100) {      // print every 1 s

@@ -38,10 +38,10 @@ struct GsGrid {
     }
 };
 
-// SOR solve of  Δ*ψ = rhs  with Dirichlet boundary already loaded in psi's edge cells.
-// Fixed sweep count (deterministic); omega tuned for the 65² operator.
-inline void gs_solve(GsGrid& g, const std::vector<double>& rhs, int sweeps = 8000,
-                     double omega = 1.85) {
+// SOR sweep solver — retained for MASKED (irregular-domain) problems only; the
+// rectangle path below went direct at slice 6 (D-041). Fixed sweep count.
+inline void gs_solve_sor(GsGrid& g, const std::vector<double>& rhs, int sweeps = 8000,
+                         double omega = 1.85) {
     const double idR2 = 1.0 / (g.dR * g.dR), idZ2 = 1.0 / (g.dZ * g.dZ);
     for (int s = 0; s < sweeps; ++s) {
         for (int iz = 1; iz < GsGrid::NZ - 1; ++iz) {
@@ -58,6 +58,96 @@ inline void gs_solve(GsGrid& g, const std::vector<double>& rhs, int sweeps = 800
             }
         }
     }
+}
+
+// The DST DIRECT solver (D-041, the named fast solver of spec §2.1): Δ* is separable —
+// the Z direction is constant-coefficient (Dirichlet), diagonalized by the type-I
+// discrete sine transform; each Z-mode leaves a tridiagonal R-problem (Thomas solve).
+// EXACT algebraic solution of the same 5-point operator SOR iterated on — one call,
+// ~1 Mflop, deterministic (fixed-order matrix DSTs; no FFT needed at 65²).
+// Same interface as the old iterative entry: sweeps/omega accepted and IGNORED.
+inline void gs_solve(GsGrid& g, const std::vector<double>& rhs, int sweeps = 0,
+                     double omega = 0.0) {
+    (void)sweeps; (void)omega;
+    constexpr int NR = GsGrid::NR, NZ = GsGrid::NZ;
+    constexpr int NI = NR - 2, NJ = NZ - 2;
+    const double PI = 3.14159265358979;
+    const double idR2 = 1.0 / (g.dR * g.dR), idZ2 = 1.0 / (g.dZ * g.dZ);
+    // b = interior rhs minus boundary contributions (edges already hold Dirichlet psi)
+    static thread_local std::vector<double> b, bh, xh, Smat, w1, w2;
+    b.assign(size_t(NI) * NJ, 0.0);
+    bh.assign(size_t(NI) * NJ, 0.0);
+    xh.assign(size_t(NI) * NJ, 0.0);
+    for (int j = 0; j < NJ; ++j)
+        for (int i = 0; i < NI; ++i) {
+            const int ir = i + 1, iz = j + 1;
+            const double R = g.R(ir);
+            const double aE = idR2 - 1.0 / (2.0 * R * g.dR);
+            const double aW = idR2 + 1.0 / (2.0 * R * g.dR);
+            double v = rhs[size_t(iz) * NR + ir];
+            if (i == 0)      v -= aW * g.at(0, iz);
+            if (i == NI - 1) v -= aE * g.at(NR - 1, iz);
+            if (j == 0)      v -= idZ2 * g.at(ir, 0);
+            if (j == NJ - 1) v -= idZ2 * g.at(ir, NZ - 1);
+            b[size_t(i) * NJ + j] = v;
+        }
+    // sine matrix S[k][j] = sin(pi (j+1)(k+1) / (NZ-1)) (built per call — deterministic,
+    // ~4k sins; callers on the 200 Hz path amortize via the identical per-call values)
+    Smat.assign(size_t(NJ) * NJ, 0.0);
+    for (int k = 0; k < NJ; ++k)
+        for (int j = 0; j < NJ; ++j)
+            Smat[size_t(k) * NJ + j] = std::sin(PI * double((j + 1) * (k + 1)) / double(NZ - 1));
+    // forward DST along Z for each interior column
+    for (int i = 0; i < NI; ++i)
+        for (int k = 0; k < NJ; ++k) {
+            double s = 0.0;
+            const double* Sk = &Smat[size_t(k) * NJ];
+            const double* bi = &b[size_t(i) * NJ];
+            for (int j = 0; j < NJ; ++j) s += Sk[j] * bi[j];
+            bh[size_t(i) * NJ + k] = s;
+        }
+    // per-mode tridiagonal in R (Thomas, in-place work arrays)
+    w1.assign(NI, 0.0); w2.assign(NI, 0.0);
+    for (int k = 0; k < NJ; ++k) {
+        const double mu = idZ2 * (2.0 * std::cos(PI * double(k + 1) / double(NZ - 1)) - 2.0);
+        double dprev = 0.0;
+        for (int i = 0; i < NI; ++i) {
+            const int ir = i + 1;
+            const double R = g.R(ir);
+            const double aE = idR2 - 1.0 / (2.0 * R * g.dR);
+            const double aW = idR2 + 1.0 / (2.0 * R * g.dR);
+            const double d = -2.0 * idR2 + mu;
+            double bb = bh[size_t(i) * NJ + k];
+            if (i == 0) {
+                w1[0] = d; w2[0] = bb;
+            } else {
+                const double m2 = aW / dprev;
+                // subtract m2 * (previous row's upper coeff aE(ir-1)) from diag
+                const double aEprev = idR2 - 1.0 / (2.0 * g.R(ir - 1) * g.dR);
+                w1[i] = d - m2 * aEprev;
+                w2[i] = bb - m2 * w2[i - 1];
+            }
+            dprev = w1[i];
+        }
+        {
+            const int iN = NI - 1;
+            xh[size_t(iN) * NJ + k] = w2[iN] / w1[iN];
+            for (int i = NI - 2; i >= 0; --i) {
+                const double aE = idR2 - 1.0 / (2.0 * g.R(i + 1) * g.dR);
+                xh[size_t(i) * NJ + k] =
+                    (w2[i] - aE * xh[size_t(i + 1) * NJ + k]) / w1[i];
+            }
+        }
+    }
+    // inverse DST (2/(NZ-1) normalization) back into the grid interior
+    const double inv_n = 2.0 / double(NZ - 1);
+    for (int i = 0; i < NI; ++i)
+        for (int j = 0; j < NJ; ++j) {
+            double s = 0.0;
+            const double* xi = &xh[size_t(i) * NJ];
+            for (int k = 0; k < NJ; ++k) s += Smat[size_t(k) * NJ + j] * xi[k];
+            g.at(i + 1, j + 1) = inv_n * s;
+        }
 }
 
 // ---- the Solov'ev analytic acceptance test -----------------------------------------

@@ -96,6 +96,8 @@ struct ScenarioCfg {                 // contracts/scenarios/<name>.toml
     bool   vert_on = false;          // enable the linearized vertical model
     bool   vs_on = true;             // VS feedback loop (false = open-loop = the enemy)
     bool   vde_kick = false; double kick_mm = 25.0, kick_t_lo = 5.0, kick_t_hi = 5.0;
+    // M1 slice 6: [ramp] block (D-041 schema addition) — scheduled Ip ramp, floors-legal
+    bool   ramp = false; double ramp_ip_end_MA = 8.5, ramp_t0 = 0.0, ramp_t1 = 0.0;
     uint32_t scenario_id = 0;        // fnv1a32 of name — part of the Philox counter
 };
 

@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
 
     // (1) Solov'ev analytic verification — the classic GS-code acceptance test
     const double err = gs_solovev_check(m);
-    std::printf("solovev: rel max error %.2e on 65x65 (SOR fixed sweeps)\n", err);
+    std::printf("solovev: rel max error %.2e on 65x65 (DST direct)\n", err);
     if (!(err < 2e-3)) { std::puts("GS RED: analytic verification"); return 1; }
 
     // (2) Picard equilibrium: converges to Ip, axis shifts OUTWARD (Shafranov),

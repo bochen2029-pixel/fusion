@@ -29,6 +29,7 @@
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 namespace fusion {
@@ -305,7 +306,12 @@ struct GsFreeSolver {
         return true;
     }
 
-    void picard_iter(const MachineCfg& m, PicardState& st, int sor_sweeps) {
+    // ONE Picard iteration on caller-owned state (gw = work grid). CONST: all tables
+    // read-only — the same call serves the offline solve AND the D-041 runtime
+    // tracking mode (one warm iteration per pipeline slot at the CURRENT Ip — the
+    // real-time-GS pattern). Ip_target parameterizes ramps.
+    void picard_iter(const MachineCfg& m, GsGrid& gw, PicardState& st, int sor_sweeps,
+                     double Ip_target) const {
         const double mu0 = 1.25663706212e-6;
         const size_t ni = size_t(NR - 2) * (NZ - 2);
         // (a) plasma-field edge BC from the response matrix; SOR on the interior
@@ -313,7 +319,7 @@ struct GsFreeSolver {
         for (int iz = 1; iz < NZ - 1; ++iz)
             for (int ir = 1; ir < NR - 1; ++ir) {
                 const size_t k = size_t(iz) * NR + ir;
-                rhs[k] = mu0 * g.R(ir) * st.J[k];
+                rhs[k] = mu0 * gw.R(ir) * st.J[k];
             }
         for (size_t e = 0; e < edge_ir.size(); ++e) {
             double s = 0.0;
@@ -327,9 +333,9 @@ struct GsFreeSolver {
             st.psi_p[size_t(edge_iz[e]) * NR + edge_ir[e]] = s;
         }
         // warm-started SOR (edges hold the BC; interior carries the previous iterate)
-        g.psi = st.psi_p;
-        gs_solve(g, rhs, sor_sweeps);
-        st.psi_p = g.psi;
+        gw.psi = st.psi_p;
+        gs_solve(gw, rhs, sor_sweeps);
+        st.psi_p = gw.psi;
         // (b) total field
         for (size_t k = 0; k < st.psi_tot.size(); ++k)
             st.psi_tot[k] = st.psi_p[k] + st.psi_coil[k];
@@ -339,7 +345,7 @@ struct GsFreeSolver {
         for (int iz = 1; iz < NZ - 1; ++iz)
             for (int ir = 1; ir < NR - 1; ++ir) {
                 const size_t k = size_t(iz) * NR + ir;
-                if (!in_wall(g.R(ir), g.Z(iz))) continue;
+                if (!in_wall(gw.R(ir), gw.Z(iz))) continue;
                 if (st.psi_tot[k] < pmin) { pmin = st.psi_tot[k]; st.ax_ir = ir; st.ax_iz = iz; }
             }
         st.psi_axis = pmin;
@@ -370,7 +376,7 @@ struct GsFreeSolver {
                     const size_t k2 = size_t(iz2) * NR + ir2;
                     if (st.mask[k2]) continue;
                     if (st.psi_tot[k2] >= bound - eps) continue;
-                    if (!in_wall(g.R(ir2), g.Z(iz2))) {          // wall-blocked frontier
+                    if (!in_wall(gw.R(ir2), gw.Z(iz2))) {          // wall-blocked frontier
                         wall_touch_psi = std::fmin(wall_touch_psi, st.psi_tot[k2]);
                         continue;
                     }
@@ -394,18 +400,18 @@ struct GsFreeSolver {
         const double span = (st.psi_bnd - st.psi_axis) > 1e-30 ? st.psi_bnd - st.psi_axis : 1e-30;
         std::vector<double> Jn(st.J.size(), 0.0);
         double Ip_now = 0;
-        const double dA = g.dR * g.dZ;
+        const double dA = gw.dR * gw.dZ;
         for (int iz = 1; iz < NZ - 1; ++iz)
             for (int ir = 1; ir < NR - 1; ++ir) {
                 const size_t k = size_t(iz) * NR + ir;
                 if (!st.mask[k]) continue;
                 const double pb = std::clamp((st.psi_tot[k] - st.psi_axis) / span, 0.0, 1.0);
                 const double w = 1.0 - pb;
-                const double R = g.R(ir);
+                const double R = gw.R(ir);
                 Jn[k] = w * (R * 1.0e4 + 1.0 / (mu0 * R));
                 Ip_now += Jn[k] * dA;
             }
-        const double Ip_t = m.Ip_MA * 1e6;
+        const double Ip_t = Ip_target;
         const double sc = Ip_t / (std::fabs(Ip_now) > 1.0 ? Ip_now : 1.0);
         for (auto& v : Jn) v *= sc;
         for (size_t k = 0; k < st.J.size(); ++k) st.J[k] = 0.5 * st.J[k] + 0.5 * Jn[k];
@@ -425,8 +431,43 @@ struct GsFreeSolver {
     // ---- the full solve: warm start -> (fit -> Picard) x n_outer -> outputs --------
     // Outer alternation: refit against the evolved J, 0.5-under-relaxed on currents
     // (fit chasing plasma chasing fit oscillates otherwise — measured).
+    // the axis-local external-field derive (shared by solve() and the tracking mode)
+    VertDerived derive_at_axis(const PicardState& st, double Ip_A) const {
+        VertDerived v;
+        auto Bz_coil = [&](int ir) {
+            const size_t k = size_t(st.ax_iz) * NR + ir;
+            return -(st.psi_coil[k + 1] - st.psi_coil[k - 1]) / (2.0 * g.dR * g.R(ir));
+        };
+        const double Bz0 = Bz_coil(st.ax_ir);
+        const double dBzdR = (Bz_coil(st.ax_ir + 1) - Bz_coil(st.ax_ir - 1)) / (2.0 * g.dR);
+        v.Bz_ext_axis_T = Bz0;
+        v.R_axis_m = g.R(st.ax_ir);
+        v.n_decay = (std::fabs(Bz0) > 1e-12) ? -(v.R_axis_m / Bz0) * dBzdR : 0.0;
+        v.k_dest_Npm = -2.0 * PI() * v.R_axis_m * Ip_A * dBzdR;
+        v.set = true;
+        return v;
+    }
+
+    // ---- D-041: the runtime tracking mode ------------------------------------------
+    // Per-run state seeded from the converged full solve; track_step runs ONE warm
+    // Picard iteration at the CURRENT Ip and re-derives the vertical inputs. Fixed
+    // coil currents (no shape controller until M2) — the shape drift under ramps is
+    // the physics, and the lethal-legal lever (relative elongation grows as Ip falls).
+    struct FreeTrack {
+        GsGrid gw;
+        PicardState st;
+    };
+    void seed_track(const PicardState& converged, FreeTrack& tr) const {
+        tr.gw = g;                       // geometry copy (psi overwritten per solve)
+        tr.st = converged;
+    }
+    VertDerived track_step(const MachineCfg& m, FreeTrack& tr, double Ip_A) const {
+        picard_iter(m, tr.gw, tr.st, 0, Ip_A);
+        return derive_at_axis(tr.st, Ip_A);
+    }
+
     FreeEq solve(const MachineCfg& m, int n_outer = 4, int n_picard = 30,
-                 bool verbose = false) {
+                 bool verbose = false, PicardState* keep = nullptr) {
         const double mu0 = 1.25663706212e-6;
         FreeEq out;
         // warm start: the verified fixed-boundary equilibrium (exports its J — D-039)
@@ -444,7 +485,7 @@ struct GsFreeSolver {
                 Ifit[c] = (outer == 0) ? Inew[c] : 0.5 * Ifit[c] + 0.5 * Inew[c];
             load_coil_field(Ifit, st.psi_coil);
             for (int it = 0; it < n_picard; ++it)
-                picard_iter(m, st, it == 0 ? 4000 : 1500);
+                picard_iter(m, g, st, 0, m.Ip_MA * 1e6);
             if (verbose)
                 std::printf("  outer %d: fit_rms %.2e  I[kAt] %.0f %.0f %.0f %.0f %.0f %.0f"
                             "  axis R %.3f Z %+.4f  X(%.3f,%.3f)%s  psi_x-pw %+.3e\n",
@@ -544,19 +585,14 @@ struct GsFreeSolver {
         };
         out.q95 = q_of(0.95);
         out.q0 = q_of(0.10);
-        // k_dest from the COIL field (the true external field at equilibrium):
-        // Bz_std = (1/R) d(psi_std)/dR with psi_std = -psi_coil_code
+        // k_dest from the COIL field (the true external field at equilibrium)
         {
-            auto Bz_coil = [&](int ir) {
-                const size_t k = size_t(st.ax_iz) * NR + ir;
-                return -(st.psi_coil[k + 1] - st.psi_coil[k - 1]) / (2.0 * g.dR * g.R(ir));
-            };
-            const double Bz0 = Bz_coil(st.ax_ir);
-            const double dBzdR = (Bz_coil(st.ax_ir + 1) - Bz_coil(st.ax_ir - 1)) / (2.0 * g.dR);
-            out.Bz_ext_axis_T = Bz0;
-            out.n_decay = (std::fabs(Bz0) > 1e-12) ? -(out.eq.R_axis / Bz0) * dBzdR : 0.0;
-            out.k_dest_Npm = -2.0 * PI() * out.eq.R_axis * out.eq.Ip_A * dBzdR;
+            const VertDerived v = derive_at_axis(st, out.eq.Ip_A);
+            out.Bz_ext_axis_T = v.Bz_ext_axis_T;
+            out.n_decay = v.n_decay;
+            out.k_dest_Npm = v.k_dest_Npm;
         }
+        if (keep) *keep = st;
         (void)mu0;
         return out;
     }
@@ -566,6 +602,21 @@ inline FreeEq gs_free_solve(const MachineCfg& m, bool verbose = false) {
     GsFreeSolver s;
     s.init(m);
     return s.solve(m, 4, 30, verbose);
+}
+
+// D-041: the shared free-boundary runtime context — tables + the converged seed state,
+// built ONCE per process by Monte-Carlo callers and shared read-only across runs
+// (run_sim copies the seed state per run; ~170 KB). Pure function of the machine.
+struct FreeContext {
+    GsFreeSolver solver;               // tables const after init (read-only use)
+    GsFreeSolver::PicardState seed;    // the converged flat-top state
+    FreeEq ref;                        // the reference equilibrium (reported numbers)
+};
+inline std::shared_ptr<const FreeContext> gs_free_context(const MachineCfg& m) {
+    auto ctx = std::make_shared<FreeContext>();
+    ctx->solver.init(m);
+    ctx->ref = ctx->solver.solve(m, 4, 30, false, &ctx->seed);
+    return ctx;
 }
 
 } // namespace fusion
