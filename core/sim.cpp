@@ -126,6 +126,9 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     double Vcmd_applied = 0.0;
     double i_meas_prev = 0.0;                  // last coil-current measurement (the
                                                // policy's Kivs input; D-040/D-043)
+    double z_sq_sum = 0.0; uint64_t z_sq_n = 0;      // D-045: z_rms settled window
+    double z_int_acc = 0.0, z_peak_acc = 0.0;        // D-044c smoothness window
+    double v_eff_sum = 0.0; uint64_t v_eff_n = 0;    // VS effort (objective term)
     const InnovCfg icfg = in.ic;       // events.toml [innovation], loaded by the caller
     // D-041: the free-boundary equilibrium is the RUNTIME k_dest source (D-039's
     // pre-registered rewiring; the fixed-boundary derive is now the verification
@@ -249,15 +252,28 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             double Vcmd = 0.0;
             if (sc.vs_on) {
                 // observation build: truth injection is a SIM-SIDE dev affordance
-                // (CTL-11); the policy cannot tell — the fence stands either way
+                // (CTL-11); the policy cannot tell — the fence stands either way.
+                // D-045: the LQG taps (EKF q_s/I_vs estimates) + the OBSERVER'S
+                // applied k_dest (vnom's — relinked at pipeline applies; the
+                // rtEFIT-class published value, stated simplification).
                 const VertObs vo{ k.vs_truth ? xvert[0] : vekf.xz,
                                   k.vs_truth ? xvert[1] : vekf.xv,
-                                  i_meas_prev };
+                                  i_meas_prev,
+                                  vekf.x[2], vekf.x[3],
+                                  vnom.k_dest };
                 Vcmd = policy_vs(vo, k, pst);
             }
             vmod.step_rk4(xvert, Vcmd, DT_TICK);
             Vcmd_applied = Vcmd;
             r.z_max_m = std::max(r.z_max_m, std::fabs(xvert[0]));
+            // D-045 metrics law: z_rms over the settled window; D-044c smoothness
+            // over [t_evt, t_evt+2 s]; VS effort under the objective's actuator term.
+            if (t >= 2.0) { z_sq_sum += xvert[0] * xvert[0]; ++z_sq_n; }
+            if (tick >= kick_tick && double(tick - kick_tick) * DT_TICK < 2.0) {
+                z_int_acc += std::fabs(xvert[0]) * DT_TICK;
+                z_peak_acc = std::max(z_peak_acc, std::fabs(xvert[0]));
+            }
+            v_eff_sum += (Vcmd_applied / 2000.0) * (Vcmd_applied / 2000.0); ++v_eff_n;
             // synthetic diagnostics (diagnostics.toml): noise + bias walk + LATENCY
             // (magnetics 2 ticks, coil_sensors 1 tick — the contract lines, D-040)
             const Gauss2 gn = gauss2(seed, 3u, sc.scenario_id, uint32_t(tick & 0xFFFFFFFFu));
@@ -464,6 +480,9 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
 
     if (!terminated) { r.verdict = Verdict::GOOD; r.t_end = sc.duration_s; }
     if (sc.vert_on) r.nis_mean = vekf.nis_mean();
+    if (z_sq_n) r.z_rms = std::sqrt(z_sq_sum / double(z_sq_n));
+    r.z_int_post = z_int_acc; r.z_peak_post = z_peak_acc;
+    if (v_eff_n) r.v_effort = v_eff_sum / double(v_eff_n);
     r.minQ_window = (minQ > 1e29) ? 0.0 : minQ;
     r.q_rms = q_n ? std::sqrt(q_se / double(q_n)) : 0.0;
     r.effort = eff_n ? eff / double(eff_n) : 0.0;

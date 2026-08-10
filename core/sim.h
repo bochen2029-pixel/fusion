@@ -46,6 +46,15 @@ struct RunResult {
     // M1 slice 1 (vertical channel; zeros when [vertical] is off)
     double gamma_wall = 0.0, gamma_open = 0.0;   // REPORTED eigen growth rates [1/s]
     double z_max_m = 0.0;                         // max |Z| over the run
+    double z_rms = 0.0;                           // RMS Z over the settled window
+                                                  // (t >= 2 s, RUN mode) — D-045's
+                                                  // health-metric law (zmax hid a
+                                                  // 62 mm standing wave once; S12)
+    double z_int_post = 0.0, z_peak_post = 0.0;   // D-044c smoothness: int |z| dt and
+                                                  // peak |z| over [t_evt, t_evt+2 s]
+    double v_effort = 0.0;                        // mean (Vcmd/2000)^2 — the VS channel
+                                                  // under the objective's [actuators]
+                                                  // effort term (D-045)
     double nis_mean = 0.0;                        // EKF consistency statistic
     long   innov_events = 0;
     long   gs_solves = 0, gs_late = 0;           // D-041 pipeline accounting

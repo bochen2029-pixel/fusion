@@ -5,6 +5,8 @@
 #include "core/gs.h"
 #include "core/gs_free.h"
 #include "core/philox.h"
+#include "control/policy.h"   // D-045: dev modes route through the REAL fence call
+                              // (include order: sim.h precedes the fence macro — safe)
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -77,21 +79,27 @@ int main(int argc, char** argv) {
     in.vd = vd;                     // the cross-check record (unused by run_sim now)
     in.fctx = fctx;                 // the runtime context, once (D-041)
 
-    // ---- DEV budget mode: test_vertical <root> budget — the §7.4 tick-budget datum
-    // (KICKOFF build note: measure the linear step + EKF early, receipt p99.9).
+    // ---- DEV budget mode: test_vertical <root> budget [gains.toml] — the §7.4
+    // tick-budget datum AND D-044(b)'s matched-compute instrument: wall-us p99.9 over
+    // 200k ticks with the policy routed through the REAL fence call (PD or LQ per the
+    // gains file; retune/step/EKF are common infrastructure, present in both arms).
     // Wall-clock lives HERE, outside run_sim — the sim path stays clock-free.
     if (argc > 2 && std::string(argv[2]) == "budget") {
+        const GainsCfg bk = (argc > 3) ? load_gains(argv[3]) : in.k;
         VerticalModel bm; bm.build(m, vd.k_dest_Npm);
         VerticalEKF be; be.init(bm, 0.75e-3, 20.0);
+        PolicyState bps{};
         double xb[VerticalModel::N] = {0}; xb[0] = 1e-3;
         const int NB = 2000, BATCH = 100;                  // 200k ticks in 100-tick batches
         std::vector<double> ns_per(NB);
         for (int b = 0; b < NB; ++b) {
             const auto t0 = std::chrono::high_resolution_clock::now();
             for (int i = 0; i < BATCH; ++i) {
-                const double V = -(5e4 * be.xz + 200.0 * be.xv);
+                const VertObs bo{ be.xz, be.xv, xb[2 + VerticalModel::NP],
+                                  be.x[2], be.x[3], bm.k_dest };
+                const double V = policy_vs(bo, bk, bps);
                 bm.retune(8.5e6 - (i & 15) * 1e3, vd.k_dest_Npm);   // D-041 per-tick path
-                bm.step_rk4(xb, std::clamp(V, -2000.0, 2000.0), 1e-4);
+                bm.step_rk4(xb, V, 1e-4);
                 be.predict(V, 1e-4);
                 be.update(xb[0] + 1e-4 * ((i & 7) - 3.5)); // deterministic dither
                 be.update_i(xb[2 + VerticalModel::NP]);
@@ -101,28 +109,67 @@ int main(int argc, char** argv) {
             if (xb[0] > 0.15) { xb[0] = 1e-3; for (int i = 1; i < VerticalModel::N; ++i) xb[i] = 0; }
         }
         std::sort(ns_per.begin(), ns_per.end());
-        std::printf("tick budget (vertical step + EKF, batch-of-%d medians): "
-                    "p50 %.0f ns  p99 %.0f ns  p99.9 %.0f ns  (100 us tick)\n",
-                    BATCH, ns_per[NB / 2], ns_per[int(NB * 0.99)], ns_per[NB - 2]);
+        std::printf("tick budget (retune + step + EKF + policy_vs[%s], batch-of-%d "
+                    "medians): p50 %.0f ns  p99 %.0f ns  p99.9 %.0f ns  (100 us tick)\n",
+                    bk.lq_on ? "LQ" : "PD", BATCH,
+                    ns_per[NB / 2], ns_per[int(NB * 0.99)], ns_per[NB - 2]);
         return 0;
     }
 
-    // ---- DEV trace mode: test_vertical <root> trace <seed> <out.tsv> — replicates
-    // the sim's vertical block (same draws) and dumps the filter's view per tick.
+    // ---- DEV lqdump mode: test_vertical <root> lqdump <n> <kd_lo> <kd_hi> <out.tsv>
+    // — D-045: the LQ design inputs. Per k_dest grid point on the frozen-coil co-move
+    // manifold (Ip = Ip_ref*kd/kd_ref), the EKF's OWN discrete 4-state (Phi, Bd) at
+    // NOMINAL constants — one nominal build, per-point retune, build-time gamma in
+    // the tau_s calibration: EXACTLY the runtime filter behavior, mirrored. gamma_wall
+    // per point is recomputed for the receipt only (never fed to model_from).
+    if (argc > 6 && std::string(argv[2]) == "lqdump") {
+        const int ng = std::atoi(argv[3]);
+        const double kd_lo = std::atof(argv[4]), kd_hi = std::atof(argv[5]);
+        if (ng < 2 || !(kd_hi > kd_lo)) { std::puts("lqdump: bad grid"); return 2; }
+        VerticalModel nom; nom.build(m, fctx->ref.k_dest_Npm);     // ONE nominal build
+        const double kd_ref = fctx->ref.k_dest_Npm, Ip_ref = fctx->ref.eq.Ip_A;
+        FILE* f = std::fopen(argv[6], "wb");
+        if (!f) { std::puts("lqdump: cannot open out"); return 2; }
+        std::fprintf(f, "# lqdump (D-045): VerticalEKF::model_from at NOMINAL constants "
+                        "on the co-move manifold; kd_ref %.9e Ip_ref %.9e\n"
+                        "# cols: kd Ip gamma_wall kwall m_eff cs Phi[16 row-major] Bd[4]\n",
+                        kd_ref, Ip_ref);
+        for (int gi2 = 0; gi2 < ng; ++gi2) {
+            const double kd = kd_lo + (kd_hi - kd_lo) * gi2 / double(ng - 1);
+            const double Ipg = Ip_ref * kd / kd_ref;
+            nom.retune(Ipg, kd);
+            const double gw = nom.dominant_growth(true);   // receipt only (const)
+            VerticalEKF ek; ek.model_from(nom);
+            std::fprintf(f, "%.9e %.9e %.6e %.9e %.4f %.9e",
+                         kd, Ipg, gw, nom.kwall_, nom.m_eff, ek.cs_);
+            for (int a2 = 0; a2 < 4; ++a2)
+                for (int b2 = 0; b2 < 4; ++b2) std::fprintf(f, " %.17e", ek.Phi[a2][b2]);
+            for (int a2 = 0; a2 < 4; ++a2) std::fprintf(f, " %.17e", ek.Bd[a2]);
+            std::fprintf(f, "\n");
+        }
+        std::fclose(f);
+        std::printf("lqdump: %d points [%.3e, %.3e] -> %s\n", ng, kd_lo, kd_hi, argv[6]);
+        return 0;
+    }
+
+    // ---- DEV trace mode: test_vertical <root> trace <seed> <out.tsv> [gains.toml] —
+    // replicates the sim's vertical block (same draws) and dumps the filter's view per
+    // tick; the policy runs through the fence call (arm per the gains file — D-045).
     if (argc > 4 && std::string(argv[2]) == "trace") {
         const uint64_t seed = std::strtoull(argv[3], nullptr, 10);
+        const GainsCfg tg = (argc > 5) ? load_gains(argv[5]) : in.k;
         VerticalModel pm; pm.build(m, vd.k_dest_Npm, 1.0, 1.0);   // nominal plant here
         VerticalEKF fe; fe.init(pm, 0.75e-3, 20.0);
+        PolicyState tps{};
         double xs[VerticalModel::N] = {0}; xs[0] = 3e-3;
-        double zl[2] = {xs[0], xs[0]}, il = 0, bias = 0, Vap = 0, fvlp = 0;
-        const double LPA = 1.0 - std::exp(-2.0 * 3.14159265358979 * 60.0 * 1e-4);
+        double zl[2] = {xs[0], xs[0]}, il = 0, bias = 0, Vap = 0, im_prev = 0;
         FILE* f = std::fopen(argv[4], "wb");
         std::fprintf(f, "t\tz\tv\txz\txv\tnu\tS\tIvs\txI\tVcmd\n");
         const uint32_t sid = fnv1a32("vde_kick");
         for (uint64_t tk = 0; tk < 80000; ++tk) {
             if (tk == 50000) pm.kick_state(xs, 0.060);
-            fvlp += LPA * (fe.xv - fvlp);
-            const double V = std::clamp(-(5e4 * fe.xz + 200.0 * fvlp), -2000.0, 2000.0);
+            const VertObs tvo{ fe.xz, fe.xv, im_prev, fe.x[2], fe.x[3], pm.k_dest };
+            const double V = policy_vs(tvo, tg, tps);
             pm.step_rk4(xs, V, 1e-4);
             Vap = V;
             const Gauss2 gn = gauss2(seed, 3u, sid, uint32_t(tk));
@@ -131,6 +178,7 @@ int main(int argc, char** argv) {
             const double zm = zl[tk % 2] + bias + 0.75e-3 * gn.g0;
             const double im = il + 20.0 * gi.g0;
             zl[tk % 2] = xs[0]; il = xs[2 + VerticalModel::NP];
+            im_prev = im;
             fe.predict(Vap, 1e-4);
             fe.update(zm);
             fe.update_i(im);
@@ -163,24 +211,29 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    // ---- DEV sweep mode: test_vertical <root> sweep — maps the gain landscape,
-    // truth-feedback vs EKF-feedback, to separate controller from estimator issues.
+    // ---- DEV sweep mode: test_vertical <root> sweep [scenario.toml] — maps the PD
+    // gain landscape, truth-feedback vs EKF-feedback, to separate controller from
+    // estimator issues. D-045 remap: health = z_rms over the settled window (zmax hid
+    // a 62 mm standing wave once); optional scenario arg reaches off-design points.
     if (argc > 2 && std::string(argv[2]) == "sweep") {
-        in.s = load_scenario(root + "/contracts/scenarios/vde_kick.toml");
+        in.s = load_scenario(argc > 3 ? std::string(argv[3])
+                                      : root + "/contracts/scenarios/vde_kick.toml");
         const double KPS[] = { 2e4, 5e4, 1e5, 2e5, 4e5 };
         const double KDS[] = { 200, 1000, 3000, 8000, 20000 };
         for (int truth = 1; truth >= 0; --truth) {
-            std::printf("== feedback on %s ==\n", truth ? "TRUTH (dev)" : "EKF estimate");
+            std::printf("== feedback on %s  (scenario %s; health = z_rms) ==\n",
+                        truth ? "TRUTH (dev)" : "EKF estimate", in.s.name.c_str());
             for (double kp : KPS) for (double kd : KDS) {
                 in.k.Kpz = kp; in.k.Kdz = kd; in.k.vs_truth = truth != 0;
-                int g = 0; double zm = 0, nis = 0;
+                int g = 0; double zm = 0, zr = 0, nis = 0;
                 for (uint64_t s = 100; s < 106; ++s) {
                     RunResult rr = run_sim(in, s, false);
                     if (rr.verdict == Verdict::GOOD) ++g;
-                    zm = std::fmax(zm, rr.z_max_m); nis += rr.nis_mean / 6.0;
+                    zm = std::fmax(zm, rr.z_max_m); zr = std::fmax(zr, rr.z_rms);
+                    nis += rr.nis_mean / 6.0;
                 }
-                std::printf("  Kp %8.0f Kd %6.0f: GOOD %d/6  zmax %.3f  NIS %.1f\n",
-                            kp, kd, g, zm, nis);
+                std::printf("  Kp %8.0f Kd %6.0f: GOOD %d/6  zmax %.3f  z_rms %.4f  "
+                            "NIS %.1f\n", kp, kd, g, zm, zr, nis);
             }
         }
         return 0;

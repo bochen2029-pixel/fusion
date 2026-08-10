@@ -103,6 +103,7 @@ ObjectiveCfg load_objective(const std::string& path) {
     o.effort_weight = num(t, "actuators", "effort", 0.01);
     o.gate_miss_cost = num(t, "gate", "miss_cost", 500.0);
     o.minq_shortfall_w = num(t, "gate", "minq_shortfall_weight", 2000.0);
+    o.z_weight = num(t, "tracking", "z_position_m", 400.0);   // D-045
     return o;
 }
 
@@ -231,6 +232,34 @@ GainsCfg load_gains(const std::string& path) {
     g.Kdz = num(t, "vs", "Kdz", 200.0);
     g.Kivs = num(t, "vs", "Kivs", 0.0);
     g.vs_truth = t["vs"]["truth"].value_or(false);   // DEV-ONLY (CTL-11 forbids shipping)
+    // M2 slice 1 (D-045): the [lq] schedule — five arrays, same length >= 2, kdest
+    // ascending. Absent table => lq_on false (the PD path; bit-identical to M1).
+    if (auto* lt = t["lq"].as_table()) {
+        g.lq_on = (*lt)["on"].value_or(false);
+        auto arr = [&](const char* key, double* dst) -> int {
+            int i = 0;
+            if (auto* a = (*lt)[key].as_array()) {
+                for (auto& e : *a) {
+                    if (i >= GainsCfg::LQ_MAX) break;
+                    if (auto v = e.value<double>()) dst[i] = *v;
+                    else if (auto w = e.value<int64_t>()) dst[i] = double(*w);
+                    ++i;
+                }
+            }
+            return i;
+        };
+        const int n0 = arr("kdest", g.lq_kd);
+        const int n1 = arr("Kz", g.lq_Kz), n2 = arr("Kv", g.lq_Kv);
+        const int n3 = arr("Kq", g.lq_Kq), n4 = arr("Ki", g.lq_Ki);
+        g.lq_n = n0;
+        if (g.lq_on) {
+            if (n0 < 2 || n1 != n0 || n2 != n0 || n3 != n0 || n4 != n0)
+                throw std::runtime_error("gains [lq]: five arrays, same length >= 2");
+            for (int i = 1; i < n0; ++i)
+                if (!(g.lq_kd[i] > g.lq_kd[i - 1]))
+                    throw std::runtime_error("gains [lq]: kdest must ascend");
+        }
+    }
     return g;
 }
 

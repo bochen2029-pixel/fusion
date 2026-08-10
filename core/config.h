@@ -122,12 +122,25 @@ struct GainsCfg {                    // control/gains_m0.toml (CEM output, commi
     bool   vs_truth = false;                    // DEV-ONLY calibration switch: PD on true
     // state instead of the EKF estimate. Never true in a committed scenario/gains file;
     // the M1-full statecheck fence will make the shipping build unable to compile it.
+    // M2 slice 1 (D-045): the LQ vertical null — certainty-equivalent LQG gains,
+    // DARE-designed offline (trainer/lq_design.py) from the EKF's own 4-state model,
+    // scheduled on the observer's applied k_dest (obs.h k_dest_sched), linearly
+    // interpolated. u = -K(kd)*xhat, clamped to the supply. The PD path above stays
+    // runtime-selectable (stronger-of-per-channel law, D-044).
+    static constexpr int LQ_MAX = 16;
+    bool   lq_on = false;
+    int    lq_n = 0;
+    double lq_kd[LQ_MAX] = {0};                        // k_dest grid [N/m], ascending
+    double lq_Kz[LQ_MAX] = {0}, lq_Kv[LQ_MAX] = {0};   // V/m, V/(m/s)
+    double lq_Kq[LQ_MAX] = {0}, lq_Ki[LQ_MAX] = {0};   // V per q_s-unit, V/A
 };
 
 struct ObjectiveCfg {                // contracts/objective.toml (M0-consumed subset)
     double disrupt_cost = 10000.0, spine_cost = 6000.0, timeout_cost = 0.0;
     double q_weight = 1.0, effort_weight = 0.01;
     double gate_miss_cost = 500.0, minq_shortfall_w = 2000.0;   // D-032(h)
+    double z_weight = 400.0;         // [tracking].z_position_m — implemented at M2
+                                     // (D-045; priced on z_rms^2; zero on tier-0 runs)
 };
 
 MachineCfg     load_machine(const std::string& path);

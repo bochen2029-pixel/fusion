@@ -47,4 +47,12 @@ crn               = true    # common random numbers: all F-NULL-C arms run the S
 [stats]             # the statistics falsifiers use (CTL-08(5))
 rate_ci           = "wilson95"           # for GOOD/DISRUPT/SPINE_SHUTDOWN rates
 rms_test          = "paired-bootstrap-bca-95"  # Wilson cannot apply to RMS
-decision_rule     = "lexicographic: (1) disrupt+spine rate lower-CI must not worsen; (2) then tracking RMS must improve; split outcomes = the null wins"
+# D-044(c) amendment: per-scenario-class scoring closes the hollow-win path (a net
+# "winning" tracking RMS against setpoints the null STRATEGICALLY ignores — D-033's
+# hot-hold). Survival-class scenarios score rates then smoothness; tracking-class
+# scenarios score RMS; class membership is pinned per scenario at the curriculum
+# freeze (S17 D-entry).
+decision_rule     = "lexicographic per scenario class (D-044c): survival-class scores disrupt+spine rate then pre-registered smoothness; tracking-class scores RMS; strict rate win with non-worsened RMS = win; rate tie + tracking-class RMS win = win; ANY split = the null wins"
+guard_min_pass    = 98     # no-regression bound per guard scenario at N=100 (D-044c: the original four curriculum scenarios guard the F-NULL-C grid)
+smooth_window_s   = 2.0    # smoothness window = [t_event, t_event + smooth_window_s] (D-044c; pre-registered NUMERICALLY, not post-hoc)
+smooth_metrics    = "z_int_abs + z_peak"   # int |z| dt over the window [m*s] and peak |z| in it [m] (RunResult z_int_post / z_peak_post)

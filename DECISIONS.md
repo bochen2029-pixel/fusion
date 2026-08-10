@@ -437,3 +437,84 @@ cross-session with the operator ratifying.*
   [1.29, 1.40] in [0.5, 2.0]; determinism 8/8 incl. pipeline counters. DoD clauses:
   the organ IS the null (P-13, stated); goldens committed; ROADMAP flipped;
   KICKOFF_M2 written; snapshot taken. M1 closes at nine slices, D-035…D-043.
+- **D-044 · 2026-08-10 · M2 pre-registration batch I — architecture, gate contract,
+  seed law (M2 open; relay-adjudicated with the M1 instance, operator ratifying).**
+  (a) LADDER RULING: the scheduled LQG occupies rung (a) as a HAND-BUILT artifact and
+  IS the null — no trained gain-schedule net (it would re-learn the schedule the LQG
+  already computes); the first TRAINED arm is the residual-on-LQG (rung b); e2e /
+  raw-actuator is the stretch arm (rung c). Claim discipline: a residual win is stated
+  as "net+null beats null at matched compute" — the unqualified claim is reserved for
+  rung (c). (b) MATCHED COMPUTE pinned: the metric is wall-µs p99.9 on the tick path
+  via the SHARED test_vertical budget-mode instrument (same machine, ≥200k ticks,
+  receipted per arm); both arms satisfy the <50 µs law and publish p99.9 side by side;
+  the EKF and the pipeline/retune are common infrastructure counted in NEITHER arm;
+  the residual arm's budget = null + net SUMMED; no FLOPs accounting; VRAM matched
+  trivially (both CPU, D-012). (c) F-NULL-C GATE GRID: the original four curriculum
+  scenarios stay in the grid as NO-REGRESSION GUARDS with a numeric bound (net pass
+  ≥ 98/100 per guard scenario); separation is claimed on the pre-registered hardened
+  set (frozen at the curriculum-freeze D-entry, S17). Decision rule AMENDED
+  (objective.toml [stats], this commit): per-scenario-class scoring — survival-class
+  scores disrupt+spine rate then pre-registered smoothness (∫|z|dt over [t_event,
+  t_event+2.0 s] and peak |z| in that window — numeric NOW, not post-hoc);
+  tracking-class scores RMS; a strict rate win with non-worsened RMS = win; a rate
+  tie with a tracking-class RMS win = win; ANY split outcome = the null wins.
+  (d) SEED LAW for curriculum design: the null's failure curves are measured and the
+  curriculum designed on EVAL seeds (800000–899999); gate seeds stay untouched until
+  the single F-NULL-C attempt. On the record: the frozen null cannot leak, but the
+  curriculum design CAN — if scenario magnitudes are chosen from gate-domain
+  measurements, the task itself was fitted to the gate's seeds and the attempt is no
+  longer a fresh draw of the task. (e) ORDERING: the observation-world changes
+  (bolometer, rogowski noise, gs_late anger test, renderer EvKinds 9–11) land BEFORE
+  any failure-curve measurement (S14's lesson: any observation-world change moves
+  trajectories); the world freezes, then the curves, then the freeze D-entry, then
+  training.
+- **D-045 · 2026-08-10 · M2 slice 1 — the LQ vertical null (the composite null's
+  vertical channel; design pre-registered before tuning, measured numbers appended).**
+  DESIGN: certainty-equivalent LQG on the EKF's OWN discrete 4-state model
+  [z, v, q_s, I_vs] — (Phi, Bd) from VerticalEKF::model_from at NOMINAL constants,
+  mirroring runtime filter behavior exactly (one nominal build; per-point retune;
+  build-time gamma in the tau_s calibration — the filter's own approximation,
+  mirrored not improved). Q/R derived from objective.toml (the null and the net
+  literally optimize the same declared objective): Q = diag(qz·10^θ1,
+  qz·τ_v²·10^θ2, 0, 0) with qz = [tracking].z_position_m, τ_v = 0.02 s; R =
+  [actuators].effort / v_max² (v_max = 2000 V, the supply clamp). CEM polishes ONLY
+  the two log-scales (θ1, θ2) on train seeds (vde_kick + rampdown), playoff protocol
+  mandatory (D-033's ±10% batch-noise lesson). SCHEDULE: k_dest-only v1 — offline
+  DARE (structured doubling, residual-checked, closed-loop spectral radius < 1
+  asserted) over a 12-point grid kd ∈ [1.4e7, 3.5e7] N/m evaluated on the
+  frozen-coil co-move manifold (Ip_i = Ip_ref·kd_i/kd_ref); linear interpolation,
+  clamped ends; if the deep lethal-legal decouples (kd, Ip), revisit by D-entry.
+  RUNTIME: policy_vs grows an [lq] branch behind the same fence seam — u = −K(kd)·x̂
+  on all four EKF states, clamped ±2000 V; the PD+derivative-filter path is retained
+  runtime-selectable (stronger-of-per-channel law; the 60 Hz filter was a PD-specific
+  artifact guard — the LQ design model CONTAINS the damped artifact; pumping verified
+  absent by trace+spectrum before adoption). OBS CONTRACT: VertObs gains q_s_est,
+  i_vs_est (EKF states — certainty equivalence) and k_dest_sched (the OBSERVER'S
+  applied value — rtEFIT-class published quantity, reconstruction-assumed-good STATED
+  simplification per D-041/D-042; routed through the frame struct so statecheck sees
+  it, never a side channel). METRICS LAW: the sweep/health metric is z_rms over the
+  settled window (t ≥ 2 s, RUN mode) — zmax hid a 62 mm standing wave once (S12);
+  z_rms + the D-044c smoothness fields + VS effort added to RunResult; fusor_mc
+  COMPLETES the objective's implementation (z_position_m priced on z_rms; VS effort
+  priced same-normalized as Paux effort; tier-0 scenarios numerically unchanged —
+  z_rms/v_effort are zero there). Truth-feedback stays a diagnosis instrument, never
+  a tuning surface. MEASURED (receipt runs/m2s1-lqnull-2026-08-10.md; eval seeds
+  800000:800100, N=100): objective-derived Q/R at face value (th=0,0) has LQG-classic
+  ZERO MARGINS — Kz 1.13e6/Kv 2591 at the design point disrupts 20/20 pre-kick from
+  the 3 mm jitter (the design loop is stable by construction, rho_cl 0.9989; the
+  real 27-state+latency+noise+EKF loop pumps); the stable basin is th ~ (-3 to -5),
+  CEM-recentered PRE-run and receipted as design-stage bracketing. CEM winner
+  th=(-3.123, -4.782), playoff cost 4.323, all 6 finalists tied at 200/200 (flat
+  basin). RESULT: the LQ ships as the composite null's vertical channel — same
+  survival (100/100 on vde_kick/rampdown/hl_backtransition), **3.5-16x less VS effort**
+  (v_eff kick 7e-4->2e-4, ramp 3.58e-3->2.2e-4), **strictly cleaner NIS** (the PD's
+  off-design pumping, rampdown NIS upper 102.71 on the worst seed, vanishes -> LQ
+  [0.98,1.04]), equal-or-better z_rms, equal compute (both <5 us p99.9 of the 50 us
+  tick). Kv 1.55 vs the PD's Kdz 200 — state feedback on q_s/I_vs replaces derivative
+  feedback (no probe-noise amplification -> no artifact pumping; the PD-specific 60 Hz
+  filter is correctly absent). The remap (runs/m2s1/remap_*.txt) confirmed both relay
+  Q8 predictions: EKF-fed Kd cliff stays ~1000 (the stale S10 maps were right about
+  the in-loop landscape), the Kp floor rises at the ramp point. ctest 8/8 (PD path
+  bit-identical — golden fnv unmoved); gains_m2.toml is the new default, gains_m0.toml
+  (PD) retained runtime-selectable. The hollow-win-vs-a-limit-cycling-PD path is now
+  closed: F-NULL-C's net must beat a near-minimal-effort, clean-lane baseline.

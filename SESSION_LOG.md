@@ -477,3 +477,58 @@ nine M1 slices, D-035…D-043, all on `m1-shape`, merged to `main` at the gate.
 
 **Next:** a fresh session opens **`KICKOFF_M2.md`** (branch `m2-cerebellum`) — the
 cerebellum. The null to beat is receipted and waiting.
+
+---
+
+## S16 · 2026-08-10 · M2 slice 1 — the LQ vertical null (partial-commit; M2 open)
+
+**Done (branch `m2-cerebellum`; receipt `runs/m2s1-lqnull-2026-08-10.md` + `runs/m2s1/`;
+D-044, D-045):** the relay round with the M1 instance (25 questions, operator-relayed)
+adjudicated first; its rulings pinned as **D-044** (rung ruling: LQG is the hand-built
+rung (a) and IS the null, first trained arm = residual-on-LQG, claim phrased "net+null
+beats null"; matched-compute = wall-µs p99.9 on the shared budget instrument; F-NULL-C
+grid guard ≥98/100 + per-scenario-class decision rule + numeric smoothness metrics;
+curriculum designed on EVAL seeds, gate seeds untouched; world-freeze ordering) and the
+LQ design as **D-045**. Then the slice: **certainty-equivalent LQG on the EKF's own
+4-state model** — test_vertical `lqdump` (per-grid-point (Φ,Bd) from
+`VerticalEKF::model_from` on the frozen-coil co-move manifold) → `trainer/lq_design.py`
+(pure-stdlib DARE, structured doubling, residual+spectral-radius+decay asserted per
+point) → `gains_m2.toml [lq]`; a scheduling `policy_vs` branch behind the SAME fence
+(u = −K(k_dest)·x̂, K interpolated); VertObs grew three fence-legal taps (q_s/I_vs
+estimates + the observer's applied k_dest, rtEFIT-class stated simplification);
+RunResult+fusor_mc completed the objective (z_rms priced under [tracking].z_position_m,
+VS effort under [actuators]). **ctest 8/8 — PD path bit-identical (golden fnv unmoved).**
+
+**Measured (eval seeds 800000:800100, N=100; the STRONGER-OF, published both arms):**
+objective-derived Q/R at face value has **LQG-classic zero margins** (th=0 disrupts
+20/20 pre-kick; design loop stable-by-construction, real loop pumps) — the stable
+basin th≈(−3,−5) was CEM-recentered pre-run + receipted as design-stage bracketing.
+CEM winner **th=(−3.123, −4.782)**, playoff cost 4.323, all 6 finalists tied 200/200
+(flat basin = robustness). **The LQ dominates the PD on the vertical channel:** same
+survival (100/100 on vde_kick·rampdown·hl_backtransition), **3.5–16× less VS effort**
+(v_eff kick 7e-4→2e-4, ramp 3.58e-3→2.2e-4), **strictly cleaner NIS** (the PD's
+off-design pumping — rampdown NIS upper 102.71 worst-seed — vanishes to LQ [0.98,1.04]),
+z_rms tie-or-win (ramp 1.56→1.36 mm), equal compute (**both <5 µs p99.9** of the 50 µs
+tick: PD 4804 ns / LQ 3895 ns on the shared budget instrument). Kv 1.55 vs the PD's
+Kdz 200 — state feedback replaces derivative feedback, so no probe-noise→artifact
+pumping (trace+spectrum clean, nis_mean 1.11, no 180/136 Hz line). The **remap**
+(`runs/m2s1/remap_*.txt`) confirmed both relay Q8 predictions: EKF-fed Kd cliff stays
+~1000 (stale S10 maps right about the in-loop landscape), Kp floor rises at the ramp
+point; the M0-shipped (5e4, 200) PD is the single cell clean on all three health axes
+at both operating points. easy identity 50/50 both arms bit-identical (tier-0 untouched).
+
+**Null result (DoD 3):** the LQ ships as the composite null's vertical channel
+(`gains_m2.toml` = new default; burn PIDs unchanged from M0; PD retained
+runtime-selectable). F-NULL-C's baseline is now a near-minimal-effort, clean-lane
+controller — the hollow-win-vs-a-limit-cycling-PD path is closed BY CONSTRUCTION.
+
+**Honest state:** M2 OPEN — slice 1 only. The composite null (PID+LQ) exists and is
+the strong baseline the cerebellum must beat. No batched envs yet, no trained arm, no
+per-seed trajectory oracle, no hardened curriculum. The LQ schedule is k_dest-only
+(the co-move manifold; a κ-drift-at-constant-Ip lethal-legal would need the (kd,Ip)
+2-D revisit D-045 flagged).
+
+**Next (S17a per the relay Q22 split): the world-freeze slice** — bolometer + rogowski
+channels, gs_late anger test, renderer EvKinds 9–11 — then S17b's failure curves +
+curriculum-freeze D-entry (the null's knee measured on eval seeds BEFORE any training),
+then S18 (fusor_train_env + SimEnv bit-identity + ghost PoC). Branch `m2-cerebellum`.
