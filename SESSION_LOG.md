@@ -365,3 +365,31 @@ noise into the burn loop + statecheck fence, the oracle, F-SHAPE-1.
 
 **Next:** the D-024 pipeline (gs_late events, solve@T applies@T+50) OR transport —
 whichever the next session's read of KICKOFF_M1 prefers; branch `m1-shape`.
+
+---
+
+## S12 · 2026-08-09 · M1 slice 5 — the seam becomes honest (model-based EKF; same day, fresh session)
+
+**Done (branch `m1-shape`; receipt `runs/m1s5-ekf-2026-08-09.md` + `runs/m1s5/`;
+D-040):** handoff item 3. The 4-state model-based Kalman replaces the α-β stand-in —
+moment-matched reduction (instantaneous stiffness exact, slow pole bisected onto the
+reported γ_wall), D-023's information set consumed in full (plant scattered via the
+M0-reserved draws, filter nominal, diagnostics-only inputs with the contract
+latencies + the coil-current channel). **χ² NIS acceptance live: [0.5, 2.0]
+pre-registered, [1.27, 1.30] measured; kicks tokenize 20/20.** The consistent filter
+promptly indicted the plant: the undamped regularization artifact was being pumped
+into a permanent 179 Hz ±60–90 mm standing limit cycle (traced — S11's "hold" hid
+the smaller version in zmax). Fixed at the source: derivative-filtered rate feedback
++ the regularization's matching damping (ζ 0.7, artifact non-resonant by
+construction) — **dance 61.8 → 2.20 mm RMS, kick recovery zmax 0.064, γ⁻¹ 23.2 ms
+(damper's touch stated), the original 5× separation bound restored.** First §7.4
+datum: vertical step + EKF p99.9 = 2.44 µs / 100 µs tick. Gains unchanged through a
+third physics upgrade. ctest 7/7; tier-0 goldens untouched.
+
+**Honest state:** M1 OPEN — done: enemy (1), Δ* core (2a), shaped equilibrium (2b-1),
+MERGE (3), free boundary (4), model-EKF + χ² NIS (5). Remaining: the D-024 pipeline
++ DST/CR fast solver (+ covariance carry across re-linearizations), transport (l_i
+movement), diagnostics into the burn loop + statecheck fence, the oracle, F-SHAPE-1.
+
+**Next:** the DST/CR fast solver + the D-024 pipeline (the pair that makes the
+equilibrium LIVE in the tick loop), branch `m1-shape`.

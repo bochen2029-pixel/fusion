@@ -348,3 +348,25 @@ cross-session with the operator ratifying.*
   solver at 200 Hz + brings coil circuit L-R dynamics into the sim; the fixed-
   boundary path then becomes the verification harness. Receipts
   runs/m1s4-freeboundary-2026-08-09.md + runs/m1s4/. ctest 7/7.
+- **D-040 · 2026-08-09 · M1 slice 5 — the model-based EKF + χ² NIS (M1 open).** The
+  slice-1 kinematic α-β stand-in is REPLACED: a 4-state Kalman [z, v, q_s, I_vs] on
+  the reduced vertical model from the plant's own derived constants — the screening
+  mode moment-matched (exact instantaneous stiffness; decay bisected so the reduced
+  slow pole = the reported γ_wall; same nominal information set). D-023 consumed in
+  full: plant built with drawn scatter (tau_wall/coil-R — reserved since M0), filter
+  inits nominal; diagnostics-only inputs incl. the CONTRACT LATENCIES (magnetics 2
+  ticks, coil_sensors 1 tick — first implementation) + the coil-current channel.
+  **χ² NIS acceptance live: pre-registered [0.5, 2.0], measured [1.27, 1.30]** over
+  scattered kick seeds; kicks tokenize 20/20 (v0's 11/20 immaturity closed; floor
+  raised to ≥18/20). THE FILTER EXPOSED A PLANT DEFECT: the massless-limit
+  regularization (fake inertia, NO fake damping) left the screened artifact RESONANT
+  — the noisy loop pumped a permanent 179 Hz ±60–90 mm standing limit cycle (traced;
+  S11's "hold" carried the smaller version, invisible in zmax). Fixes: (1) 60 Hz
+  derivative filter on rate feedback (the α-β's sluggishness had been an accidental
+  low-pass — now stated); (2) ZETA_SCREEN = 0.7 matching damping — the artifact is
+  non-resonant BY CONSTRUCTION; dance 61.8 → 2.20 mm RMS. γ⁻¹ wall 23.2 ms (damper's
+  ~17% touch, stated, in class); γ_open stays the undamped inertial reference —
+  separation 5.5×, the ORIGINAL 5× bound restored (S11's 4× relaxation reverted).
+  §7.4 first datum: vertical step + EKF p99.9 = 2.44 µs of the 100 µs tick. Kivs
+  droop remains available-unused; gains unchanged AGAIN (5e4/200 through three
+  physics upgrades). Receipts runs/m1s5-ekf-2026-08-09.md + runs/m1s5/. ctest 7/7.

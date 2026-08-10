@@ -90,21 +90,40 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     };
     ev(0, EvKind::PhaseStart, 0, sc.Ip_MA, 0.0);
 
-    // ---- M1 slice 1: the vertical channel (D-035) ----------------------------------
+    // ---- M1: the vertical channel (D-035 · D-038 · D-040) --------------------------
     // Decoupled from the burn at this slice except: the vde gate kills heating, and
     // wall contact enters the shared TQ path. gamma is REPORTED from the eigenproblem.
     VerticalModel vmod; VerticalEKF vekf; InnovGate vig;
     double xvert[VerticalModel::N] = {0};
     double probe_bias = 0.0; int vde_dwell = 0; bool vde_gate_fired = false;
     uint64_t kick_tick = ~0ull;
+    double zlat[2] = {0, 0}, ilat[1] = {0};    // diagnostics.toml latency lines (D-040):
+                                               // magnetics 2 ticks, coil_sensors 1 tick
+    double Vcmd_applied = 0.0;
+    double fv_lp = 0.0;                        // D-040: derivative-filtered rate feedback
+    // (60 Hz first-order on the estimate's v — between the slow mode ~8 Hz and the
+    // 180 Hz regularization artifact. The model-based xv is FAITHFUL, artifact
+    // included; raw-rate PD through the 10 ms lag pumps the artifact — measured.
+    // The α-β tracker's sluggish xv was an accidental low-pass; this is the honest,
+    // stated version of the same shaping. Textbook derivative filtering, not LQ.)
+    const double LP_A = 1.0 - std::exp(-2.0 * 3.14159265358979 * 60.0 * DT_TICK);
     const InnovCfg icfg = in.ic;       // events.toml [innovation], loaded by the caller
     if (sc.vert_on) {
         // the MERGE (D-038): k_dest arrives from the shaped equilibrium, never a constant
         const VertDerived vd = in.vd.set ? in.vd : gs_vertical_derive(m);
-        vmod.build(m, vd.k_dest_Npm);
+        // D-040: the plant is built with the drawn plant_scatter truths (tau_wall,
+        // actuated-circuit R — b2.g1/b3.g0, drawn-reserved since M0, now consumed);
+        // the EKF inits from the NOMINAL build. That gap IS the D-023 information set.
+        const double tw_sc = std::clamp(1.0 + in.d.tauw_frac * b2.g1, 0.80, 1.20);
+        const double cr_sc = std::clamp(1.0 + in.d.coilR_frac * b3.g0, 0.90, 1.10);
+        vmod.build(m, vd.k_dest_Npm, tw_sc, cr_sc);        // the scattered truth
         r.gamma_wall = vmod.gamma_wall; r.gamma_open = vmod.gamma_open;
         xvert[0] = in.d.z0_mm * 1e-3 * b1.g1;              // the drawn z0 jitter, at last
-        vekf.init(vmod, 0.75e-3);                          // 4 probes averaged, 1.5 mm each
+        {
+            VerticalModel vnom; vnom.build(m, vd.k_dest_Npm);   // the filter's knowledge
+            vekf.init(vnom, 0.75e-3, 20.0);   // magnetics 4-probe avg; coil 0.2% of 10 kA
+        }
+        zlat[0] = zlat[1] = xvert[0]; ilat[0] = 0.0;
         if (sc.vde_kick) {
             const double kt = sc.kick_t_lo + (sc.kick_t_hi - sc.kick_t_lo) * b4.u1;
             kick_tick = uint64_t(kt / DT_TICK + 0.5);      // b4.u1: drawn-reserved, now used
@@ -124,18 +143,27 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             if (sc.vs_on) {
                 const double fz = k.vs_truth ? xvert[0] : vekf.xz;
                 const double fv = k.vs_truth ? xvert[1] : vekf.xv;
-                Vcmd = std::clamp(-(k.Kpz * fz + k.Kdz * fv
+                fv_lp += LP_A * (fv - fv_lp);         // derivative filter (D-040, above)
+                Vcmd = std::clamp(-(k.Kpz * fz + k.Kdz * fv_lp
                                     + k.Kivs * xvert[2 + VerticalModel::NP]),
                                   -2000.0, 2000.0);   // I_vs is a measured coil channel
             }
             vmod.step_rk4(xvert, Vcmd, DT_TICK);
+            Vcmd_applied = Vcmd;
             r.z_max_m = std::max(r.z_max_m, std::fabs(xvert[0]));
-            // synthetic probes (diagnostics.toml magnetics): noise + bias random walk
+            // synthetic diagnostics (diagnostics.toml): noise + bias walk + LATENCY
+            // (magnetics 2 ticks, coil_sensors 1 tick — the contract lines, D-040)
             const Gauss2 gn = gauss2(seed, 3u, sc.scenario_id, uint32_t(tick & 0xFFFFFFFFu));
+            const Gauss2 gi = gauss2(seed, 3u, sc.scenario_id ^ 0x5F375A86u,
+                                     uint32_t(tick & 0xFFFFFFFFu));   // coil-current chan
             probe_bias += 3.0e-6 * gn.g1;                  // 0.001 FS/s walk, FS 0.3 m
-            const double z_meas = xvert[0] + probe_bias + 0.75e-3 * gn.g0;
-            vekf.predict(xvert[2 + VerticalModel::NP], DT_TICK);   // I_vs is a measured coil channel
+            const double z_meas = zlat[tick % 2] + probe_bias + 0.75e-3 * gn.g0;
+            const double i_meas = ilat[0] + 20.0 * gi.g0;
+            zlat[tick % 2] = xvert[0];                     // 2-tick ring
+            ilat[0] = xvert[2 + VerticalModel::NP];        // 1-tick line
+            vekf.predict(Vcmd_applied, DT_TICK);           // the controller's own output
             vekf.update(z_meas);
+            vekf.update_i(i_meas);
             const double mag = vig.feed(vekf.innov_last, vekf.S_last, icfg.window_ticks,
                                         icfg.sigma_token_vertical, icfg.sigma_alarm_vertical,
                                         icfg.dwell_windows, icfg.refractory_ticks);
