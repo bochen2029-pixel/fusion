@@ -118,13 +118,15 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
 
         // ---- vertical channel, per tick (10 kHz control + EKF + innovation gate) ----
         if (sc.vert_on && mode == RUN) {
-            if (tick == kick_tick) xvert[0] += sc.kick_mm * 1e-3;
+            if (tick == kick_tick) vmod.kick_state(xvert, sc.kick_mm * 1e-3);   // D-039
             // observer-in-the-loop (CTL-11/21): the VS PD feeds back the EKF ESTIMATE
             double Vcmd = 0.0;
             if (sc.vs_on) {
                 const double fz = k.vs_truth ? xvert[0] : vekf.xz;
                 const double fv = k.vs_truth ? xvert[1] : vekf.xv;
-                Vcmd = std::clamp(-(k.Kpz * fz + k.Kdz * fv), -2000.0, 2000.0);
+                Vcmd = std::clamp(-(k.Kpz * fz + k.Kdz * fv
+                                    + k.Kivs * xvert[2 + VerticalModel::NP]),
+                                  -2000.0, 2000.0);   // I_vs is a measured coil channel
             }
             vmod.step_rk4(xvert, Vcmd, DT_TICK);
             r.z_max_m = std::max(r.z_max_m, std::fabs(xvert[0]));

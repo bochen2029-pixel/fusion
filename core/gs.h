@@ -178,6 +178,9 @@ struct ShapedEq {
                                              //   = -2π R_axis Ip (dBz_ext/dR)|axis
     double ext_residual = 0;                 // |Δ*ψ_ext|/Σ|terms| at the axis (diagnostic:
                                              //   ψ_ext must be discrete-harmonic there)
+    std::vector<double> Jphi;                // A/m² on the grid, final Picard iterate
+                                             //   (0 outside the plasma; free-boundary
+                                             //   solver's warm start + fit input, D-039)
 };
 
 inline ShapedEq gs_shaped(const MachineCfg& m, GsGrid& g, int n_picard = 18) {
@@ -305,6 +308,13 @@ inline ShapedEq gs_shaped(const MachineCfg& m, GsGrid& g, int n_picard = 18) {
     };
     out.q95 = q_of(0.95);
     out.q0 = q_of(0.10);                      // near-axis proxy (grid resolution floor)
+
+    out.Jphi.assign(g.psi.size(), 0.0);       // final-iterate current density (D-039)
+    for (int iz = 1; iz < GsGrid::NZ - 1; ++iz)
+        for (int ir = 1; ir < GsGrid::NR - 1; ++ir) {
+            const size_t k = size_t(iz) * GsGrid::NR + ir;
+            if (mask[k]) out.Jphi[k] = rhs[k] / (mu0 * g.R(ir));
+        }
 
     // ---- the MERGE (D-038): external-field decay index → k_dest, REPORTED ----------
     // ψ_total = ψ_self (the plasma current in free space) + ψ_ext (the vacuum field the

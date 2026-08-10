@@ -61,6 +61,32 @@ MachineCfg load_machine(const std::string& path) {
     m.tau_wall_s = num(t, "vessel", "tau_wall_ms", 25.0) * 1e-3;
     m.kappa_shell = num(t, "vessel", "kappa_shell", 1.5);
     if (auto v = t["vessel"]["n_passive_filaments"].value<int64_t>()) m.n_passive = int(*v);
+    m.wall_over_a = num(t, "vessel", "wall_over_a", 1.2);
+    // coil geometry arrays (D-039; fixed [coils] order, all four same length)
+    {
+        auto arr = [&](const char* key, double* dst) {
+            if (auto* a = t["coils"][key].as_array()) {
+                int i = 0;
+                for (auto& e : *a) {
+                    if (i >= MachineCfg::NCOIL) break;
+                    if (auto v = e.value<double>()) dst[i] = *v;
+                    else if (auto w = e.value<int64_t>()) dst[i] = double(*w);
+                    ++i;
+                }
+                if (i != MachineCfg::NCOIL)
+                    throw std::runtime_error(std::string("machine.toml [coils].") + key +
+                                             ": expected 12 entries");
+            } else throw std::runtime_error(std::string("machine.toml [coils].") + key +
+                                            " missing");
+        };
+        arr("r_m", m.coil_r); arr("z_m", m.coil_z); arr("half_h_m", m.coil_hh);
+        arr("turns", m.coil_turns);
+        arr("i_max_kA", m.coil_imax_At);               // conductor kA (D-039 correction)
+        for (int i = 0; i < MachineCfg::NCOIL; ++i)
+            m.coil_imax_At[i] *= 1e3 * m.coil_turns[i];   // -> circuit ampere-turns
+        if (m.coil_r[11] <= 0 || m.coil_z[11] <= 0 || m.coil_turns[11] <= 0)
+            throw std::runtime_error("machine.toml [coils]: VS1 geometry/turns must be positive");
+    }
     if (m.V <= 0 || m.nGW_e20 <= 0) throw std::runtime_error("machine.toml: bad config");
     if (m.n_passive != 24)   // the tier-1 model's compile-time filament count (vertical.h)
         throw std::runtime_error("machine.toml: n_passive_filaments != 24 (model pin)");
@@ -184,6 +210,8 @@ GainsCfg load_gains(const std::string& path) {
     g.Krad = num(t, "pid", "Krad", 0.9);
     g.Kpz = num(t, "vs", "Kpz", 5.0e4);
     g.Kdz = num(t, "vs", "Kdz", 200.0);
+    g.Kivs = num(t, "vs", "Kivs", 0.0);
+    g.vs_truth = t["vs"]["truth"].value_or(false);   // DEV-ONLY (CTL-11 forbids shipping)
     return g;
 }
 

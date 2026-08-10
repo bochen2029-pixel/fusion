@@ -31,6 +31,13 @@ struct MachineCfg {
     // vessel (passive conductor — D-038 promoted these from vertical.h hard-codes)
     double b_over_a = 1.35, tau_wall_s = 0.025, kappa_shell = 1.5;
     int    n_passive = 24;
+    double wall_over_a = 1.2;       // first-wall contour scale (limiter surface; D-039)
+    // coil geometry (D-039: the 12 circuits, [coils] order; VS1 row = the anti-series
+    // pair at (r, +-z), also consumed by vertical.h — one source)
+    static constexpr int NCOIL = 12;
+    double coil_r[NCOIL] = {0}, coil_z[NCOIL] = {0}, coil_hh[NCOIL] = {0};
+    double coil_turns[NCOIL] = {0};
+    double coil_imax_At[NCOIL] = {0};   // conductor i_max_kA x turns x 1e3 (D-039)
 };
 
 // The equilibrium→vertical bridge (the MERGE, D-038): what the vertical channel takes
@@ -102,6 +109,10 @@ struct GainsCfg {                    // control/gains_m0.toml (CEM output, commi
     // M1 slice 1: the VS vertical loop (D-035)
     double Kpz = 5.0e4, Kdz = 200.0;            // V per m / V per (m/s) — sweep-found:
     // Kd through the 10 ms actuator lag destabilizes the screened mode above ~1e3
+    double Kivs = 0.0;                          // V per A of I_vs — droop/actuator-state
+    // feedback (D-039): speeds the VS lag pole (tau' = L/(R+Kivs)); the classical fix
+    // for the phase crunch once the amended vessel put gamma^-1 at ~20 ms against the
+    // 10 ms actuator. Still a classical null (PD + droop); LQ remains M2's baseline.
     bool   vs_truth = false;                    // DEV-ONLY calibration switch: PD on true
     // state instead of the EKF estimate. Never true in a committed scenario/gains file;
     // the M1-full statecheck fence will make the shipping build unable to compile it.
