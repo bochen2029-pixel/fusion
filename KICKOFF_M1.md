@@ -15,10 +15,16 @@
 > re-linearized with the Jacobian x/P carry; rampdown.toml is the first moving-
 > equilibrium scenario (k_dest −6.8% tracked, 0 late, 20/20 GOOD, replay bit-stable);
 > the artifact is now OVERDAMPED (ζ 1.2 — the off-design-point pumping fix);
-> §7.4 vertical+EKF p99.9 = 3.78 µs.** SESSION_LOG S13 is the tail of truth.
-> **Next: transport (l_i movement — the deep lethal-legal lever) + diagnostics into
-> the burn loop + the statecheck fence, or the oracle (owns rampdown ≥95% + the
-> curriculum) — then F-SHAPE-1.**
+> §7.4 vertical+EKF p99.9 = 3.78 µs.** **Slice 7 (D-042, S14) completed the tier-1
+> physics: 1-D transport (χ calibrated to IPB98(ref) exactly in the operator's own
+> discretization), the evolving profile family (α/β_p live — rampdown k_dest tracks
+> −11.9%), state-triggered sawteeth (7 emergent in easy), burn PIDs on
+> ECE/interferometer, hl_backtransition scenario; GOLDENS REGENERATED (PHY-10);
+> easy 100/100 · hl 20/20 · rampdown 20/20 · vde 20/20 · ctest 7/7.**
+> SESSION_LOG S14 is the tail of truth.
+> **Next (S15): the statecheck fence (ctest, hard M1 gate) + the offline oracle
+> (CEM teacher, decorrelated stream — proves the curriculum ≥95%) + the F-SHAPE-1
+> attempt; the finishing session writes KICKOFF_M2.**
 > The scope list below remains the milestone's full charter.
 
 **Read first, in order:** `CLAUDE.md` → `FUSION_ARCHITECTURE_v0.2.md` **§2.1 tier-1,
