@@ -300,3 +300,34 @@ EKF + χ² NIS, the oracle, F-SHAPE-1.
 
 **Next:** a fresh session reads `docs/HANDOFF_2026-08-09.md` + `KICKOFF_M1.md`, branch
 `m1-shape`, starting with the MERGE task.
+
+---
+
+## S10 · 2026-08-09 · M1 slice 3 — the MERGE: the enemy derives from the shape (partial-commit)
+
+**Done (branch `m1-shape`; receipt `runs/m1s3-merge-2026-08-09.md` + `runs/m1s3/`
+ledgers; D-038):** the handoff's named task. `core/gs.h` decomposes ψ_total into
+ψ_self (Green-BC full-rectangle solve over J_φ — `core/rings.h` primitives extracted,
+the same ones free-boundary coil tables will use) + ψ_ext (discrete-harmonic to
+**5.5e-16**, measured); the decay index and k_dest are REPORTED at the axis:
+**n = −1.047, Bz_ext = −0.586 T, k_dest = 3.28e7 N/m — 19× slice-1's calibration**.
+The shell became real to hold it: **full 25×25 mutual matrix** (collective screening
+43× the diagonal approximation; kwall 1.66e8, margin 5.05), ONE resistivity scalar
+calibrated to the pinned τ_wall on the screening eigenmode, m_eff computed (103.8 kg,
+180 Hz artifact pin). **γ⁻¹ = 47.1 ms wall-set / 5.26 ms shell-removed** — the
+pre-registered class held by real physics where slice 1 held it by calibration.
+**γ moves with the equilibrium** (κ 1.85→1.60 ⇒ γ⁻¹ 47→68 ms; k_dest ∝ Ip² exact
+0.50/0.50) — the lethal-legal lever is constructible. Null kept (Kpz 5e4/Kdz 200:
+20/20 through 60 mm, zmax 0.089; floor/cliff mapped, ledgered). Kicks now tokenize
+**20/20** (was 11/20) with no gate change. machine.toml [vessel] kappa_shell pinned;
+SimInputs.vd bridge; new replay guard (precomputed vs on-demand bit-identical).
+ctest 7/7; tier-0 goldens untouched (vert-off paths bit-identical).
+
+**Honest state:** M1 OPEN — done: the enemy (1), the verified core (2a), the shaped
+equilibrium + q95 (2b-1), the MERGE (3). k_dest is rigid-ring-at-axis (stated);
+profiles still the fixed linear family. Remaining: free-boundary + von Hagenow +
+X-point, the D-024 pipeline schedule, transport (l_i movement), model-based EKF +
+χ² NIS, diagnostics + statecheck fence, the oracle, F-SHAPE-1.
+
+**Next:** continue `KICKOFF_M1.md` remaining-work order (free-boundary + von Hagenow
+next), branch `m1-shape`, fresh session.

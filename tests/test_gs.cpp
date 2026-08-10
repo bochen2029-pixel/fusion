@@ -49,6 +49,22 @@ int main(int argc, char** argv) {
     if (!(sh.q95 > 2.2 && sh.q95 < 4.5)) { std::puts("GS RED: q95 band"); return 1; }
     if (!(sh.q0 < sh.q95)) { std::puts("GS RED: q monotonicity"); return 1; }
 
-    std::puts("GS GREEN (2a solver verified; 2b shaped equilibrium + q95 live)");
+    // (4) the MERGE (D-038): the external field's structure at the axis, derived.
+    //     Physics-signed checks: the maintaining field is NEGATIVE for Ip>0 (inward
+    //     force against the hoop), the elongating quadrupole makes n NEGATIVE, and the
+    //     rigid-displacement gradient is therefore DESTABILIZING (k_dest > 0). The
+    //     magnitude class check lives with gamma in test_vertical; here order-of-
+    //     magnitude sanity only. psi_ext must be discrete-harmonic at the axis.
+    std::printf("merge:  Bz_ext(axis) %.3f T  n_decay %.3f  k_dest %.3e N/m  "
+                "ext_residual %.2e\n",
+                sh.Bz_ext_axis_T, sh.n_decay, sh.k_dest_Npm, sh.ext_residual);
+    if (!(sh.Bz_ext_axis_T < -0.2 && sh.Bz_ext_axis_T > -3.0)) {
+        std::puts("GS RED: maintaining-field sign/magnitude"); return 1; }
+    if (!(sh.n_decay < 0.0)) { std::puts("GS RED: decay index not destabilizing"); return 1; }
+    if (!(sh.k_dest_Npm > 1e6 && sh.k_dest_Npm < 1e9)) {
+        std::puts("GS RED: k_dest order-of-magnitude"); return 1; }
+    if (!(sh.ext_residual < 0.02)) { std::puts("GS RED: psi_ext not harmonic at axis"); return 1; }
+
+    std::puts("GS GREEN (2a solver verified; 2b shaped equilibrium + q95 + derived k_dest live)");
     return 0;
 }

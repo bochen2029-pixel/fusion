@@ -1,6 +1,7 @@
 // apps/fusor_main.cpp — one verbose run: the timeline a human reads.
 // fusor --root <repo> --scenario <path> [--seed N] [--gains <path>]
 #include "core/sim.h"
+#include "core/gs.h"
 #include "core/philox.h"
 #include "core/physics_tier0.h"
 #include <cstdio>
@@ -37,6 +38,12 @@ static int run(int argc, char** argv) {
     in.k = gains_path.empty() ? load_gains(root + "/control/gains_m0.toml")
                               : load_gains(gains_path);
     in.ic = load_innov(root + "/contracts/events.toml");
+    if (in.s.vert_on) {
+        in.vd = gs_vertical_derive(in.m);                 // the MERGE (D-038)
+        std::printf("fusor  equilibrium-derived: n_decay %.3f  Bz_ext %.3f T  "
+                    "k_dest %.3e N/m\n", in.vd.n_decay, in.vd.Bz_ext_axis_T,
+                    in.vd.k_dest_Npm);
+    }
     RunResult r = run_sim(in, seed, true);
     std::printf("fusor  %s seed=%llu  H98=%.3f  puff@%.2fs\n", in.s.name.c_str(),
                 (unsigned long long)seed, r.H98_drawn, r.t_puff);

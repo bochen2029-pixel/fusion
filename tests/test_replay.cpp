@@ -1,6 +1,7 @@
 // tests/test_replay.cpp — THE memcmp replay oracle (booster constitution rule 4).
 // Same (scenario, seed, empty input tape) twice => bit-identical golden byte stream.
 #include "core/sim.h"
+#include "core/gs.h"
 #include <cstdio>
 #include <cstring>
 
@@ -30,6 +31,22 @@ int main(int argc, char** argv) {
                     (unsigned long long)seed, a.golden.size(),
                     (unsigned long long)a.fnv, (unsigned long long)b.fnv);
     }
+    // The MERGE (D-038): the vde path with the equilibrium in the loop. The precomputed
+    // (SimInputs.vd set) and on-demand (unset) derivations must yield BIT-IDENTICAL
+    // runs — gs_vertical_derive is a pure deterministic function of the machine config.
+    in.s = load_scenario(root + "/contracts/scenarios/vde_kick.toml");
+    in.vd = VertDerived{};                          // unset: run_sim derives internally
+    RunResult u = run_sim(in, 777, true);
+    in.vd = gs_vertical_derive(in.m);               // set: the caller-precomputed path
+    RunResult p = run_sim(in, 777, true);
+    if (u.golden.size() != p.golden.size() ||
+        std::memcmp(u.golden.data(), p.golden.data(),
+                    u.golden.size() * sizeof(GoldenRec)) != 0 || u.fnv != p.fnv) {
+        std::fprintf(stderr, "REPLAY ORACLE RED: vd precomputed vs on-demand diverged\n");
+        return 1;
+    }
+    std::printf("replay vde_kick 777: precomputed==on-demand, fnv %016llx  OK\n",
+                (unsigned long long)p.fnv);
     std::puts("REPLAY ORACLE GREEN");
     return 0;
 }
