@@ -26,6 +26,8 @@ enum class EvKind : uint32_t {
     GsLate = 9,         // D-024/D-041: a revalidation request hit an in-flight solve —
                         // the pipeline could not serve it timely (deterministic
                         // surrogate of wall-late; F-KEEPUP's aggregate-pacing datum)
+    Sawtooth = 10,      // D-042: q0 < 1 core crash (state-triggered; PHY-14)
+    HLBack = 11,        // D-042: H->L back-transition step (confinement collapse)
 };
 struct EventRec { uint64_t tick; EvKind kind; uint32_t arg; double v0, v1; };
 #pragma pack(pop)
@@ -45,6 +47,8 @@ struct RunResult {
     long   innov_events = 0;
     long   gs_solves = 0, gs_late = 0;           // D-041 pipeline accounting
     double k_dest_end = 0.0;                     // last applied k_dest (ramp receipts)
+    double li_end = 0.0, q0_end = 0.0, alpha_end = 0.0;   // D-042 profile reports
+    long   sawteeth = 0;
     uint64_t fnv = 0;               // FNV-1a64 over the golden byte stream
     std::vector<GoldenRec> golden;  // filled when record=true
     std::vector<EventRec> events;   // filled when record=true (the tap rides the golden flag)

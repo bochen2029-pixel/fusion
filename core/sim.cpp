@@ -6,6 +6,7 @@
 #include "vertical.h"
 #include "gs.h"
 #include "gs_free.h"
+#include "transport.h"
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
@@ -41,7 +42,11 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     const Gauss2 b2 = gauss2(seed, st, id, 2);   // H98 scatter (blind), tau_wall (unused)
     const Gauss2 b3 = gauss2(seed, st, id, 3);   // coil_R (unused), actuator-lag scatter
     const Draw2  b4 = draw2(seed, st, id, 4);    // puff time u, puff mag u (mag fixed in easy)
+    const Draw2  b5 = draw2(seed, st, id, 5);    // hl_backtransition time u, target u (D-042
+                                                 // — new block APPENDED; layout stable)
     const double H98 = std::clamp(m.H98 * (1.0 + in.d.H98_sig * b2.g0), 0.6, 1.4);
+    const double t_hl = sc.hl ? (sc.hl_t_lo + (sc.hl_t_hi - sc.hl_t_lo) * b5.u0) : -1.0;
+    const double hl_target = in.d.hl_lo + (in.d.hl_hi - in.d.hl_lo) * b5.u1;
     const double tau_act = std::clamp(m.tau_act_s * (1.0 + in.d.actlag_frac * b3.g1), 0.05, 1.0);
     r.H98_drawn = H98;
     const double t_puff = sc.puff ? (sc.puff_t_lo + (sc.puff_t_hi - sc.puff_t_lo) * b4.u0) : -1.0;
@@ -61,6 +66,29 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     s.Sgas = k.S_ff_e20 * 1e20;
     {   Derived d0 = derive(s, m, H98);
         s.Pal = d0.Palpha_inst;              // start the lag state at equilibrium
+    }
+
+    // ---- D-042: the tier-1 1-D burn (20-node T(rho), n(rho); transport.h) ----------
+    // The 0-D State keeps W/ne as VOLUME MIRRORS of the profiles (goldens/gates/
+    // verdict paths unchanged in form; values regenerate — PHY-10). The burn PIDs now
+    // read DIAGNOSTICS (ECE core chord cross-calibrated once at start + latched with
+    // one sub-cycle latency; interferometer nbar) — the policy path off true state.
+    Tier1Burn t1;
+    t1.init(m, T0, s.ne);
+    double hl_H98 = H98;                      // the live confinement timeline
+    bool hl_fired = false;
+    double T_obs_prev, n_obs_prev, ece_cal;
+    {   // mirrors + the frozen ECE cross-calibration from the initialized profiles
+        double W0 = 0, nb0 = 0, Tv0 = 0;
+        for (int j = 0; j < Tier1Burn::NRHO; ++j) {
+            W0 += 3.0 * t1.n[j] * t1.T[j] * E_KEV_J * t1.Vj(j);
+            nb0 += t1.n[j] * t1.Vj(j);
+            Tv0 += t1.T[j] * t1.Vj(j);
+        }
+        s.W = W0; s.ne = nb0 / m.V;
+        T_obs_prev = 0.5 * (t1.T[1] + t1.T[2]);
+        n_obs_prev = s.ne;
+        ece_cal = std::clamp(T_obs_prev / std::max(Tv0 / m.V, 1e-3), 1.0, 3.0);
     }
 
     // ---- Loop ----
@@ -120,6 +148,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     VertDerived vd_pend;               // in-flight pipeline result (applies at +50)
     uint64_t pipe_apply = ~0ull;       // apply tick of the in-flight solve
     double Ip_solve_ref = 0.0, z_solve_ref = 0.0, Ip_prev_solve = 0.0;
+    double alpha_prev_solve = 1.0, bp_prev_solve = 1.0, bp_ref = -1.0;
     bool reval_latched = false;
     if (sc.vert_on) {
         fctx = in.fctx ? in.fctx : gs_free_context(m);
@@ -188,11 +217,26 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
                             reval_latched = true;
                         }
                     } else {
+                        // D-042: the PROFILE STATE also triggers/parameterizes solves —
+                        // alpha (PHY-14 family exponent) and the burn's beta_p enter
+                        // the GS source; gamma now moves with l_i through the ramp.
+                        const double Bpa = 1.25663706212e-6 * s.Ip /
+                            (2.0 * 3.14159265358979 * m.a *
+                             std::sqrt((1.0 + m.kappa_a * m.kappa_a) / 2.0));
+                        const double bp_now = 2.0 * 1.25663706212e-6 *
+                            ((2.0 / 3.0) * s.W / m.V) / std::max(Bpa * Bpa, 1e-12);
+                        if (bp_ref <= 0) bp_ref = bp_now;
+                        const double bp_scale = std::clamp(bp_now / bp_ref, 0.5, 2.0);
                         const bool moved = std::fabs(s.Ip - Ip_prev_solve) >
-                                           1e-4 * std::fabs(Ip_prev_solve);
+                                           1e-4 * std::fabs(Ip_prev_solve) ||
+                                           std::fabs(t1.alpha_prof - alpha_prev_solve) > 5e-3 ||
+                                           std::fabs(bp_scale - bp_prev_solve) > 5e-3;
                         if (moved || revalidate) {
-                            vd_pend = fctx->solver.track_step(m, ftrack, s.Ip);
+                            vd_pend = fctx->solver.track_step(m, ftrack, s.Ip,
+                                                              t1.alpha_prof, bp_scale);
                             Ip_prev_solve = s.Ip;
+                            alpha_prev_solve = t1.alpha_prof;
+                            bp_prev_solve = bp_scale;
                             ++r.gs_solves;
                         } else vd_pend = vd_now;           // stationary: reuse (identical)
                         pipe_apply = tick + 50;
@@ -266,10 +310,25 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
         }
 
         if (mode == RUN && tick % SUBCYCLE == 0) {
-            d = derive(s, m, H98);
+            d = derive(s, m, hl_H98);
+            // ---- D-042: the hl_backtransition timeline (H98 steps to the drawn
+            // target for dur_s, then recovers; the plant event is recorded) ----
+            if (sc.hl && t >= t_hl && t < t_hl + sc.hl_dur_s) {
+                if (!hl_fired) { hl_fired = true;
+                    ev(tick, EvKind::HLBack, 0, hl_target, t_hl); }
+                hl_H98 = std::min(H98, hl_target);
+            } else hl_H98 = H98;
+            // ---- D-042: the burn PIDs read DIAGNOSTICS (one-sub-cycle latency,
+            // latched): ECE core chord (sigma 3%, cross-calibrated ONCE against the
+            // initial profile then FROZEN — peaking drift vs the frozen calibration
+            // is the honest measurement error) + interferometer nbar (sigma 0.03e20).
+            const Gauss2 gd = gauss2(seed, 3u, sc.scenario_id ^ 0xC3C3C3C3u,
+                                     uint32_t((tick / SUBCYCLE) & 0xFFFFFFFFu));
+            const double T_obs = (T_obs_prev / ece_cal) * (1.0 + 0.03 * gd.g0);
+            const double n_obs = n_obs_prev + 0.03e20 * gd.g1;
             // ---- the null controller (1 kHz): T-loop -> P_aux, n-loop -> S_gas ----
             const double Pmax = m.P_aux_max_MW * 1e6;
-            const double eT = sc.T_set_keV - d.T;
+            const double eT = sc.T_set_keV - T_obs;
             const bool ok_T = (s.Paux > 1e5 && s.Paux < Pmax * 0.999) ||
                               (eT > 0) == (s.Paux < Pmax * 0.5);
             // D-033: bolometric radiation feedforward — counter the measured loss NOW,
@@ -283,7 +342,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             const double slew = m.slew_MW_per_s * 1e6 * dt_pid;              // rate floor
             p = std::clamp(p, paux_cmd_prev - slew, paux_cmd_prev + slew);
             paux_cmd_prev = p; c.Paux_cmd = p;
-            const double en = sc.n_set_e20 - s.ne / 1e20;
+            const double en = sc.n_set_e20 - n_obs / 1e20;
             double sg = (k.S_ff_e20 + pidN.step(en, dt_pid, k.Kpn, k.Kin, 0.0, true)) * 1e20;
             sg = std::clamp(sg, 0.0, m.S_gas_max_e20 * 1e20);
             // ---- governor floors (M0-active; D-041: the Greenwald boundary tracks
@@ -294,7 +353,24 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             if (s.ne <= in.f.nmin_e20 * 1e20) sg = m.S_gas_max_e20 * 1e20;      // refuse down
             c.Sgas_cmd = sg;
 
-            // ---- RK4 burn step, h = 1 ms (the sub-cycle law) ----
+            // ---- D-042: the 1-D transport step (implicit, 20 nodes) OWNS T/n; the
+            // 0-D RK4 below advances the remainder states (ash, impurity, psi, lags,
+            // actuators, Ip) — operator splitting at the 1 ms sub-cycle, stated.
+            Tier1Burn::StepIO io{};
+            io.Pal_W = s.Pal; io.Paux_W = s.Paux; io.Pohm_W = d.Pohm;
+            io.Sgas = s.Sgas; io.fDT = d.nDT / std::max(s.ne, 1e17);
+            io.nimp_frac = s.nimp / std::max(s.ne, 1e17);
+            io.Zeff = d.Zeff; io.H98 = hl_H98;
+            io.B0 = m.B0; io.wall_refl = m.wall_refl; io.Vmach = m.V;
+            t1.step(m, dt_pid, io);
+            if (t1.step_profile(m, dt_pid, d.Zeff, s.Ip))
+                ev(tick, EvKind::Sawtooth, 0, t1.q0_rep, t1.alpha_prof);
+            d.Prad = io.Prad_W; d.Pheat = io.Pheat_W;
+            d.Palpha_inst = io.Palpha_inst_W; d.Pfus = io.Pfus_W;
+            d.frad = d.Prad / std::max(d.Pheat, 1e6);
+
+            // ---- RK4 for the 0-D remainder, h = 1 ms (the sub-cycle law) ----
+            // (ds.W/ds.ne advanced-and-DISCARDED — the profile mirrors overwrite them)
             // D-041: the scheduled [ramp] rate enters the integrator here — the ONE
             // dynamics source; floors pre-checked at scenario load (0.6 < 0.85 MA/s)
             const double dIp = (sc.ramp && t >= sc.ramp_t0 && t < sc.ramp_t1)
@@ -306,19 +382,19 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             s2.nimp += 0.5 * h * k1.nimp; s2.psi += 0.5 * h * k1.psi; s2.Pal += 0.5 * h * k1.Pal;
             s2.Ip += 0.5 * h * k1.Ip;
             s2.Paux += 0.5 * h * k1.Paux; s2.Sgas += 0.5 * h * k1.Sgas;
-            const State k2 = rhs(s2, derive(s2, m, H98), c, m, dIp, tau_act);
+            const State k2 = rhs(s2, derive(s2, m, hl_H98), c, m, dIp, tau_act);
             State s3 = s;
             s3.W += 0.5 * h * k2.W; s3.ne += 0.5 * h * k2.ne; s3.nHe += 0.5 * h * k2.nHe;
             s3.nimp += 0.5 * h * k2.nimp; s3.psi += 0.5 * h * k2.psi; s3.Pal += 0.5 * h * k2.Pal;
             s3.Ip += 0.5 * h * k2.Ip;
             s3.Paux += 0.5 * h * k2.Paux; s3.Sgas += 0.5 * h * k2.Sgas;
-            const State k3 = rhs(s3, derive(s3, m, H98), c, m, dIp, tau_act);
+            const State k3 = rhs(s3, derive(s3, m, hl_H98), c, m, dIp, tau_act);
             State s4 = s;
             s4.W += h * k3.W; s4.ne += h * k3.ne; s4.nHe += h * k3.nHe;
             s4.nimp += h * k3.nimp; s4.psi += h * k3.psi; s4.Pal += h * k3.Pal;
             s4.Ip += h * k3.Ip;
             s4.Paux += h * k3.Paux; s4.Sgas += h * k3.Sgas;
-            const State k4 = rhs(s4, derive(s4, m, H98), c, m, dIp, tau_act);
+            const State k4 = rhs(s4, derive(s4, m, hl_H98), c, m, dIp, tau_act);
             const double w = h / 6.0;
             s.W += w * (k1.W + 2 * k2.W + 2 * k3.W + k4.W);
             s.ne += w * (k1.ne + 2 * k2.ne + 2 * k3.ne + k4.ne);
@@ -329,9 +405,17 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             s.Pal += w * (k1.Pal + 2 * k2.Pal + 2 * k3.Pal + k4.Pal);
             s.Paux += w * (k1.Paux + 2 * k2.Paux + 2 * k3.Paux + k4.Paux);
             s.Sgas += w * (k1.Sgas + 2 * k2.Sgas + 2 * k3.Sgas + k4.Sgas);
+            // D-042: the profile mirrors overwrite the discarded 0-D W/ne advance
+            s.W = io.W_J; s.ne = io.nbar;
             s.ne = std::max(s.ne, 1e17); s.nHe = std::max(s.nHe, 0.0);
             s.nimp = std::max(s.nimp, 0.0); s.W = std::max(s.W, 1e3);
-            d = derive(s, m, H98);
+            d = derive(s, m, hl_H98);
+            d.Prad = io.Prad_W; d.Pheat = io.Pheat_W;
+            d.Palpha_inst = io.Palpha_inst_W; d.Pfus = io.Pfus_W;
+            d.frad = d.Prad / std::max(d.Pheat, 1e6);
+            d.Q = d.Pfus / std::max(s.Paux, 0.5e6);
+            // diagnostics latch (one-sub-cycle latency; ECE cross-cal frozen at init)
+            T_obs_prev = io.T_core; n_obs_prev = io.nbar;
 
             // ---- spine gates + terminal physics (per burn step; dwell in ticks) ----
             // quench_precursor: f_rad > 1.0 dwell, OR T halves in 2 ms (predicate mirror)
@@ -408,6 +492,9 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     const bool window_complete = (t_puff > 0) && (hold_hi <= sc.duration_s) && !terminated;
     r.pass = (r.verdict == Verdict::GOOD) && window_complete && (r.minQ_window >= sc.q_min);
     if (!sc.puff) r.pass = (r.verdict == Verdict::GOOD) && (r.minQ_window >= sc.q_min);
+    if (trc) std::fclose(trc);
+    r.li_end = t1.li_1d; r.q0_end = t1.q0_rep;
+    r.alpha_end = t1.alpha_prof; r.sawteeth = t1.sawteeth;
     if (record && !r.golden.empty())
         r.fnv = fnv1a64(r.golden.data(), r.golden.size() * sizeof(GoldenRec));
     return r;

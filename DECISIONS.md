@@ -400,3 +400,21 @@ cross-session with the operator ratifying.*
   bound stands). §7.4: retune+step+EKF p99.9 = 3.78 µs / 100 µs. DEV forensics:
   SimInputs.trace_path (never in gates). Receipts runs/m1s6-pipeline-2026-08-09.md +
   runs/m1s6/. ctest 7/7.
+- **D-042 · 2026-08-09 · M1 slice 7 — 1-D transport + the profile lever (M1 open;
+  GOLDENS REGENERATED per PHY-10).** core/transport.h: 20-node T(ρ)/n(ρ), implicit
+  Thomas at the 1 ms sub-cycle (operator splitting with the 0-D remainder, stated);
+  χ CALIBRATED in the operator's own discretization (steady solve at χ0=1, one
+  division → τ_E(ref) = IPB98(ref) exactly; χ0 = 0.086 m²/s receipted) with IPB98's
+  power degradation backed into χ ∝ (P/P_ref)^0.69/H98; D0 = 0.016 calibrated on the
+  BC-SUBTRACTED source part (two calibration bugs found+fixed, receipted). PHY-14
+  live: α (GS family exponent) relaxes to neoclassical peaking on τ_CR (~13 s);
+  β_p enters the GS split from the burn's W; l_i/q0 REPORTED (conventions stated);
+  SAWTEETH state-triggered (q0<1 → core flatten + α·0.8 + EvKind::Sawtooth) — 7
+  emergent crashes in the easy 30 s run, zero scheduled randomness. Burn PIDs moved
+  to DIAGNOSTICS (ECE frozen-cross-cal + latency; interferometer; spine/governor
+  stay plant-side, stated). hl_backtransition.toml ships (H98 step to drawn 0.70-
+  0.85 via the APPENDED b5 draw block; EvKind::HLBack). MEASURED: easy MC 100/100
+  (the tier-1 baseline; M0's 985/1000 is history), hl 20/20, rampdown 20/20 with
+  the lever live — k_dest tracked −11.9% (α/β_p adds −5.1% over S13's fixed-profile
+  −6.8%), vde 20/20, replay green, ctest 7/7, goldens regenerated (3 seeds).
+  Receipts runs/m1s7-transport-2026-08-09.md + runs/m1s7/.
