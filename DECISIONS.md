@@ -597,3 +597,29 @@ cross-session with the operator ratifying.*
   kick_during_ramp, puff_kick, sawtooth_storm); mags/timings are FROZEN — changing one = a
   superseding D-entry. The FINAL F-NULL-C attempt re-measures all nine on GATE seeds once.
   ctest 9/9 (margin_min observer-only; new scenarios determinism-spot-checked).
+- **D-048 · 2026-08-10 · M2 slice S18 — the stepwise plant (SimEnv) + batched envs +
+  the ghost PoC (relay Q13/Q14/Q18/Q23).** run_sim's one-shot loop body EXTRACTED into
+  `core/sim_env.h` `struct SimEnv` — state in MEMBERS, `step()` advances ONE tick, run_sim
+  is now `reset(); while(step()){} finish();`. **The extraction is BIT-IDENTICAL — golden
+  fnv unmoved, replay + parity green** (the S15 fence pattern: the golden is the proof).
+  The loop-terminal `break`s became mid-body `return false` (skipping that tick's
+  scoring+golden exactly as before). Fence: sim_env.h is a true-state header (added to
+  statecheck FORBIDDEN_HEADERS); it includes control/policy.h LAST (after sim.h's poison
+  guard passes) so PolicyState is a value member without tripping the fence — sim_env.h is
+  core-side, invisible to the policy TU's closure. WHY: PPO needs stepwise envs; the ghost
+  needs fork-at-T; both fall out of a copyable, steppable SimEnv. **fusor_train_env** (the
+  batched runner, spec's FOURTH consumer of one-dynamics-source, D-011): parallel SimEnv
+  rollouts sharing ONE FreeContext (the relay Q13 law — never a per-env context build),
+  CPU-first (relay §4). MEASURED (16 threads): easy flat-top **10.76 Mtick/s** (~1.5
+  µs/tick/thread, matching the relay §4 estimate), vde_kick vertical+pipeline 1.46
+  Mtick/s. **parity_train_env** ctest: stepwise SimEnv == one-shot run_sim AND THREADED ==
+  serial, bit-exact on vde_kick/rampdown/easy (thread-safety rides gs_solve's thread_local
+  scratch + the const shared FreeContext — the relay Q13 landmine inventory, confirmed
+  clean). **ghost_fork** ctest (relay Q23 promoted): SimEnv is copyable by design, so the
+  fork is `SimEnv g = plant;` — (i) two forks from tick T run bit-identically to the plant
+  (F-GHOST criterion i: ghost-vs-ghost determinism, same fnv); (ii) a fork with VS disabled
+  from T takes the kick and DISRUPTS (z_max 0.190, wall) while the plant survives — the M3
+  ghost's counterfactual-via-command mechanism, de-risked while warm. ctest 9/9 -> **11/11**.
+  Deferred to S19: the stepwise action-injection API for PPO (step() currently runs the
+  in-binary null; the net's action hook lands with the trainer), the per-seed MPPI/CEM
+  teacher, and the CUDA port of step() (the tick loop is now a clean unit to port).
