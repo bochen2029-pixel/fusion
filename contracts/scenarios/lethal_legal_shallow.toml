@@ -1,0 +1,53 @@
+# lethal_legal_shallow — M2 S17b (D-047). The floor-legal-but-lethal class (FRESH-3),
+# shallow variant. Every command passes every floor; the danger is EMERGENT from the
+# equilibrium the legal commands produce. Mechanism (M1 instance's Q10, measured law):
+# at frozen coils kwall ~ Ip^2 but k_dest ~ Ip^1, so the vertical margin kwall/k_dest
+# shrinks ~ Ip. A legal 0.5 MA/s rampdown (< floors 0.85) walks Ip 8.5 -> 5.5; then the
+# alpha/l_i lever keeps degrading the margin for ~20-30 s AFTER the ramp ends (tau_CR
+# ~13 s) while everything looks calm. A kick that is TRIVIAL at flat-top lands here,
+# where the margin is lowest — the ghost's showcase (M3), the net's headroom (M2).
+
+[meta]
+name         = "lethal_legal_shallow"
+class        = "lethal_legal"
+description  = "legal 0.5 MA/s rampdown to 5.5 MA; margin walks down; a routine kick lands late"
+activates_at = "M2"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 45.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[vertical]
+enabled      = true
+vs_on        = true
+
+[ramp]                     # floors-legal: 3.0 MA / 6.0 s = 0.5 MA/s < floors 0.85
+ip_end_MA    = 5.5
+t_start_s    = 3.0
+t_end_s      = 9.0
+
+[disturbances]
+# 25 mm: trivial at 8.5 MA flat-top (survives 100/100), drawn to land at t=30-40 s —
+# deep in the alpha-lever's degraded-margin window (the ramp ended at 9 s; tau_CR ~13 s)
+events = [ { type = "vde_kick", mag_mm = 25.0, t_lo = 30.0, t_hi = 40.0 } ]
+
+[pass]
+metric       = "survival"
+q_min        = 0.6         # deep-ramp Q sags legitimately (relay Q10); survival is the point
+hold_s       = 3.0
+seed_count   = 100
+pass_frac    = 0.90        # the net's target; the null's MEASURED survival is the baseline
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"

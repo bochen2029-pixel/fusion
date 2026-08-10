@@ -1,0 +1,52 @@
+# lethal_legal_deep — M2 S17b (D-047). The floor-legal-but-lethal class, DEEP variant —
+# the thesis scenario. Same construction as lethal_legal_shallow but the legal rampdown
+# goes to Ip 4.5 MA (margin ~1.4 per the M1 instance's extrapolation: Ip 8.5->7.0 took
+# margin 2.82->2.05, so ~Ip-proportional). The null MOSTLY DIES here — no linear gain
+# beats a saturating actuator once the margin collapses; the net's only edge is
+# ANTICIPATORY positioning (pre-biasing z/I_vs before the margin goes), which is exactly
+# what the innovation vector + the schedule let it learn. The ghost's M3 showcase.
+
+[meta]
+name         = "lethal_legal_deep"
+class        = "lethal_legal"
+description  = "legal 0.5 MA/s rampdown to 4.5 MA; margin collapses; a small kick lands at the bottom"
+activates_at = "M2"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 45.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[vertical]
+enabled      = true
+vs_on        = true
+
+[ramp]                     # floors-legal: 4.0 MA / 8.0 s = 0.5 MA/s < floors 0.85
+ip_end_MA    = 4.5
+t_start_s    = 3.0
+t_end_s      = 11.0
+
+[disturbances]
+# 30 mm at t=35-42 s — the bottom of the margin well (ramp ended 11 s; alpha lever
+# fully expressed by ~35 s). Trivial at flat-top; lethal here for a fixed-gain null.
+events = [ { type = "vde_kick", mag_mm = 30.0, t_lo = 35.0, t_hi = 42.0 } ]
+
+[pass]
+metric       = "survival"
+q_min        = 0.6
+hold_s       = 3.0
+seed_count   = 100
+pass_frac    = 0.90
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"

@@ -59,6 +59,11 @@ struct RunResult {
     long   innov_events = 0;
     long   gs_solves = 0, gs_late = 0;           // D-041 pipeline accounting
     double k_dest_end = 0.0;                     // last applied k_dest (ramp receipts)
+    double margin_min = 0.0;                     // min vertical stability margin
+                                                 // (kwall/k_dest) over the run — the
+                                                 // lethal-legal receipt's spine (D-047):
+                                                 // a floor-legal ramp walks this toward 1
+                                                 // while every command stays legal
     double li_end = 0.0, q0_end = 0.0, alpha_end = 0.0;   // D-042 profile reports
     long   sawteeth = 0;
     uint64_t fnv = 0;               // FNV-1a64 over the golden byte stream

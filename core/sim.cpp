@@ -130,6 +130,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     double z_sq_sum = 0.0; uint64_t z_sq_n = 0;      // D-045: z_rms settled window
     double z_int_acc = 0.0, z_peak_acc = 0.0;        // D-044c smoothness window
     double v_eff_sum = 0.0; uint64_t v_eff_n = 0;    // VS effort (objective term)
+    double margin_run_min = 1e30;                    // D-047: min kwall/k_dest over RUN
     // D-046 (S17a): the observer's Ip is a rogowski-noised, EMA-smoothed channel
     // (diagnostics.toml [rogowski]) — the D-041 "noise-free at tier-1, stated"
     // simplification removed. The PLANT's Ip stays truth (vmod.retune, track_step);
@@ -268,6 +269,13 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
                 // external field itself carried Ip — D-041 distinction)
                 const double scale = (Ip_solve_ref > 1.0) ? s.Ip / Ip_solve_ref : 1.0;
                 vmod.retune(s.Ip, vd_now.k_dest_Npm * scale);
+                // D-047: track the vertical stability margin (kwall/k_dest) — the
+                // lethal-legal spine. A floor-legal ramp walks this toward 1 (the shell
+                // can no longer hold the shape) while every command stays legal.
+                if (vmod.k_dest > 1.0) {
+                    const double marg = vmod.kwall_ / vmod.k_dest;
+                    if (margin_run_min > marg) margin_run_min = marg;
+                }
             }
             if (tick == kick_tick) vmod.kick_state(xvert, sc.kick_mm * 1e-3);   // D-039
             // observer-in-the-loop (CTL-11/21): the VS PD feeds back the EKF ESTIMATE
@@ -513,6 +521,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     if (z_sq_n) r.z_rms = std::sqrt(z_sq_sum / double(z_sq_n));
     r.z_int_post = z_int_acc; r.z_peak_post = z_peak_acc;
     if (v_eff_n) r.v_effort = v_eff_sum / double(v_eff_n);
+    r.margin_min = (margin_run_min < 1e29) ? margin_run_min : 0.0;   // D-047
     r.minQ_window = (minQ > 1e29) ? 0.0 : minQ;
     r.q_rms = q_n ? std::sqrt(q_se / double(q_n)) : 0.0;
     r.effort = eff_n ? eff / double(eff_n) : 0.0;

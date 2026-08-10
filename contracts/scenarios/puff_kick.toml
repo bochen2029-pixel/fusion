@@ -1,0 +1,53 @@
+# puff_kick — M2 S17b (D-047). Cross-channel coincidence: a strong impurity puff
+# (radiative transient on the BURN channel) near-coincident with a vde_kick (the VERTICAL
+# channel). The null's channels are DECOUPLED — the burn PID and the VS controller cannot
+# see each other; each fights its own disturbance blind to the other. The net eats the
+# innovation vector across BOTH channels (CTL-21), so this is where cross-channel headroom
+# plausibly lives (relay Q12: 35% of the headroom weight). Real machines die to
+# coincidences the single-channel controllers never anticipated.
+
+[meta]
+name         = "puff_kick"
+class        = "curriculum"
+description  = "strong impurity puff + near-coincident vde_kick — decoupled null channels, blind to each other"
+activates_at = "M2"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 12.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[vertical]
+enabled      = true
+vs_on        = true
+
+[disturbances]
+# puff at the BURN NULL'S EDGE (0.005: measured 0.004 survives 20/20, 0.005 -> ~10%
+# radiative SPINE_SHUTDOWN) + a coincident 60 mm kick at t=5-6 s: BOTH channels at their
+# limit simultaneously. HONEST framing (relay Q25.4): the beta_p -> k_dest cross-coupling
+# is scaling-grade in this model, so the deaths are burn-radiative-DOMINATED, not a clean
+# vertical cross-channel effect; the net's headroom here is its BURN head (vs the Krad=0
+# hot-hold PID that dies to radiation) plus the vertical kick, not a subtle cross-lever.
+# A no-regression + burn-head guard. One-of-each-type (relay Q11: the plumbing handles it).
+events = [ { type = "impurity_puff", mag = 0.005, t_lo = 5.0, t_hi = 5.0 },
+           { type = "vde_kick", mag_mm = 60.0, t_lo = 5.0, t_hi = 6.0 } ]
+
+[pass]
+metric       = "survival"
+q_min        = 0.8
+hold_s       = 3.0
+seed_count   = 100
+pass_frac    = 0.95
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"
