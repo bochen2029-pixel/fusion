@@ -51,10 +51,11 @@ struct VerticalModel {
     double Mfull[NC][NC];           // circuit inductance matrix [filaments..., VS]
     double Minv[NC][NC];
     double Rcirc[NC];               // circuit resistances (vessel scalar calibrated)
-    double Lvs = 2.0e-3, Rvs = 0.2;  // 20-turn in-vessel pair: tau 10 ms, 10 kA at 2 kV
-    double vs_turns = 20.0;
+    double Lvs = 2.0e-3, Rvs = 0.2;  // in-vessel pair: tau 10 ms, 10 kA at 2 kV
+    double vs_turns = 20.0;          // overwritten from machine.toml [coils] turns (D-039)
     double kwall_ = 0.0;             // instantaneous screening stiffness c^T Minv c (rep.)
     double rho_shell = 0.0;          // the calibrated surface-resistivity scalar (rep.)
+    double screen_[NC] = {0};        // flux-conserving current pattern per meter (D-039)
     double gamma_open = 0.0;        // reported: no-shell growth rate [1/s] (VS passive)
     double gamma_wall = 0.0;        // reported: with-shell growth rate [1/s]
 
@@ -116,8 +117,10 @@ struct VerticalModel {
                                ring_mutual(m.R0, Rf[j], Zf[j] + h)) / (2.0 * h);
             c_p[j] = Ip * dM;                        // N/A (and V·s/m reciprocally)
         }
-        // VS pair at (R0 +- a*1.1, +-a*1.2) anti-series: effective dM/dZ doubled
-        const double Rvs_r = m.R0 + m.a * 1.1, Zvs = m.a * 1.2;
+        // VS pair (machine.toml [coils] VS1 row — one source, D-039), anti-series:
+        // effective dM/dZ doubled
+        const double Rvs_r = m.coil_r[11], Zvs = m.coil_z[11];
+        vs_turns = m.coil_turns[11];
         const double dMvs = (ring_mutual(m.R0, Rvs_r, Zvs - h) -
                              ring_mutual(m.R0, Rvs_r, Zvs + h)) / (2.0 * h);
         c_vs = 2.0 * vs_turns * Ip * dMvs;           // anti-series multi-turn pair
@@ -172,6 +175,18 @@ struct VerticalModel {
         kwall_ = 0.0;
         for (int i = 0; i < NC; ++i)
             for (int j = 0; j < NC; ++j) kwall_ += cc[i] * Minv[i][j] * cc[j];
+        // the flux-conserving screening pattern (per meter of displacement): a physical
+        // sudden-displacement disturbance co-moves the circuit currents by -screen_*dz
+        // (D-039: a bare z teleport stores (1/2)(kwall-k_dest)dz^2 of ARTIFICIAL energy
+        // in the regularization's screened oscillator and rings it at ~omega*dz — the
+        // artifact killed curriculum seeds once the amended vessel weakened the screen;
+        // measured, receipted. On the slow manifold the excursion grows at gamma_wall —
+        // the true VDE onset.)
+        for (int i = 0; i < NC; ++i) {
+            double s = 0.0;
+            for (int j = 0; j < NC; ++j) s += Minv[i][j] * cc[j];
+            screen_[i] = s;
+        }
         // the regularization: pin the screened-oscillation artifact near F_SCREEN_HZ
         // (documented; if the shell cannot hold the shape at all — kwall <= k_dest —
         // the mode is beyond passive stabilization and the class test must catch it)
@@ -245,6 +260,12 @@ struct VerticalModel {
         { double nrm = 0; for (int i = 0; i < n; ++i) nrm += x[i] * x[i];
           logn += 0.5 * std::log(nrm > 0 ? nrm : 1e-300); }
         return (logn - logn_half) / (T * 0.5);
+    }
+
+    // physical sudden-displacement disturbance: slow-manifold state jump (see build())
+    void kick_state(double x[N], double dz) const {
+        x[0] += dz;
+        for (int i = 0; i < NC; ++i) x[2 + i] -= screen_[i] * dz;
     }
 
     void step_rk4(double x[N], double Vcmd, double dt) const {

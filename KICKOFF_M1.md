@@ -1,14 +1,18 @@
 # KICKOFF — M1 · the shape and the enemy (bootstrap for the next session)
 
-> **STATUS 2026-08-09 (S7–S10): slices 1, 2a, 2b-1, 3 are DONE and merged** — the enemy
-> (γ from the eigenproblem, VDE death chain, live innovation lane; D-035), the verified
-> Δ* core (4e-6 vs Solov'ev; D-036), the shaped equilibrium (shift +27 mm, q95 = 3.61;
-> D-037), and **the MERGE (D-038): k_dest derived from the equilibrium's decay index
-> (n −1.047, 3.28e7 N/m), the full 25×25 mutual matrix, γ⁻¹ 47.1 ms held by real
-> physics, γ moving with κ and Ip** — report-don't-configure closed end-to-end.
-> **Read `docs/HANDOFF_2026-08-09.md` FIRST** for the day's map and gotchas (its
-> remaining-work item 1, the MERGE, is done — SESSION_LOG S10 is the tail of truth;
-> **start at item 2: free-boundary + von Hagenow + X-point**, then the D-024 pipeline).
+> **STATUS 2026-08-09 (S7–S11): slices 1, 2a, 2b-1, 3, 4 are DONE and merged** — the
+> enemy (D-035), the verified Δ* core (D-036), the shaped equilibrium (D-037), the
+> MERGE (D-038: k_dest derived, full mutual matrix, γ moving with the equilibrium),
+> and **the FREE BOUNDARY (D-039): the 12-circuit coil set holds the DN separatrix
+> (X-limited, κ_ach 1.85 = the pin, q95 3.68 vs fixed 3.61, imax_frac 0.98); machine
+> pins corrected by the solver-as-fresh-eyes (coil units/positions, κ_shell 1.5→1.9 —
+> γ⁻¹ now 19.9 ms in class); the vde kick re-implemented as the flux-conserving
+> slow-manifold displacement (the teleport rang the regularization artifact — 20/20
+> restored at original kick + gains).** Report-don't-configure holds end-to-end.
+> **Read `docs/HANDOFF_2026-08-09.md`** for the day's map and gotchas (items 1 AND 2
+> are done — SESSION_LOG S11 is the tail of truth; **next: the D-024 pipeline
+> (solve@T applies@T+50, gs_late, coil L-R dynamics in-sim, free-solver k_dest at
+> 200 Hz — ownership pre-registered in D-039) or transport**).
 > The scope list below remains the milestone's full charter.
 
 **Read first, in order:** `CLAUDE.md` → `FUSION_ARCHITECTURE_v0.2.md` **§2.1 tier-1,

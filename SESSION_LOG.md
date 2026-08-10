@@ -331,3 +331,37 @@ X-point, the D-024 pipeline schedule, transport (l_i movement), model-based EKF 
 
 **Next:** continue `KICKOFF_M1.md` remaining-work order (free-boundary + von Hagenow
 next), branch `m1-shape`, fresh session.
+
+---
+
+## S11 · 2026-08-09 · M1 slice 4 — the free boundary (partial-commit; same day, fresh session)
+
+**Done (branch `m1-shape`; receipt `runs/m1s4-freeboundary-2026-08-09.md` + `runs/m1s4/`;
+D-039):** `core/gs_free.h` — coil Green tables, the plasma boundary-response matrix
+(the von Hagenow role as the exact discrete Green operator — technique ruling), the
+DN-symmetric inverse isoflux fit, and the free-boundary Picard with X-point saddle
+refinement, private-flux-safe boundary determination, and first-crossing LCFS rays.
+**The coils hold the shape: X-LIMITED at (1.629, ±1.173), κ_ach 1.85 = the pin,
+q95 3.68 (fixed-boundary 3.61 — 2% cross-validation), Ip exact, imax_frac 0.98,
+k_dest-from-coils vs decomposition ratio 0.78.** The solver acted as fresh eyes on
+the machine itself: [coils] units mislabeled (conductor kA, not kAt — corrected +
+turns pinned), PF1 belonged at the divertor position, and **the κ_shell 1.5 vessel
+could not contain the pinned separatrix — amended 1.9**, moving γ⁻¹ honestly from
+47.1 to 19.9 ms (in class; separation bound 5→4 receipted). The amended physics then
+exposed a curriculum bug: the vde kick TELEPORTED z, storing artificial screen energy
+that rang the regularization artifact and killed ~50% of seeds gain-independently
+(forensics ledgered, kick-size-invariant — the tell); replaced by the flux-conserving
+slow-manifold `kick_state`. **20/20 at the original 60 mm kick and original gains —
+no retune, no scenario change; the disturbance model was the bug.** Kicks tokenize
+15/20 (the ring had inflated S10's number — restated); tracker NIS ~40 (the
+model-based EKF slice owns χ²). ctest 7/7; tier-0 goldens untouched.
+
+**Honest state:** M1 OPEN — done: the enemy (1), the verified core (2a), the shaped
+equilibrium (2b-1), the MERGE (3), the free boundary standalone (4). The sim's
+runtime k_dest still derives fixed-boundary (pipeline slice rewires — pre-registered
+in D-039). Remaining: the D-024 pipeline schedule + coil L-R dynamics in-sim, the
+DST/CR fast solver, transport (l_i movement), model-based EKF + χ² NIS, diagnostics
+noise into the burn loop + statecheck fence, the oracle, F-SHAPE-1.
+
+**Next:** the D-024 pipeline (gs_late events, solve@T applies@T+50) OR transport —
+whichever the next session's read of KICKOFF_M1 prefers; branch `m1-shape`.

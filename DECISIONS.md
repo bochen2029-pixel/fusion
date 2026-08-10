@@ -317,3 +317,34 @@ cross-session with the operator ratifying.*
   Kd cliff 500–1000 — D-035's lag lesson re-measured at real stiffness). Innovation
   lane sharpened free: kicks tokenize 20/20 (was 11/20). Receipt
   runs/m1s3-merge-2026-08-09.md + ledgers runs/m1s3/. ctest 7/7.
+- **D-039 · 2026-08-09 · M1 slice 4 — the free boundary (M1 open).** `core/gs_free.h`:
+  coil Green tables + plasma boundary-response matrix (the exact discrete Green
+  operator, 256×3969 — the von Hagenow ROLE; the surface-integral form was a memory
+  optimization, interface swappable — technique ruling) + DN-symmetric inverse isoflux
+  fit (i_max-normalized unknowns, ridge 1e-3, flanking stations at the target-X
+  height) + free Picard (private-flux-safe boundary, first-crossing LCFS rays,
+  X-point Newton, J-symmetrization). MEASURED: X-LIMITED at (1.629, ±1.173), κ_ach
+  1.85 = the pin, q95 3.68 vs fixed 3.61, Ip exact, imax_frac 0.98, k_dest-from-coils
+  2.55e7 vs decomposition 3.28e7 (ratio 0.78, in band). MACHINE PINS (design-by-
+  inverse-fit): FUSOR-1 is DOUBLE-NULL; [coils] geometry pinned (CS stack R 0.60, PF1
+  at the divertor position 1.55/±1.50 — at 1.05/±1.75 the null dragged 0.3 m inboard,
+  measured); UNIT CORRECTION i_max_kAt→i_max_kA + turns (the values were conductor kA
+  — the VS row was always 10 kA × 20 t; MAt-scale circuits are what 8.5 MA needs);
+  wall_over_a 1.25 (1.2 grazed the separatrix); **κ_shell 1.5→1.9 AMENDED** (the 1.5
+  shell could not contain the pinned DN separatrix — target-X clearance 3.5 cm, the
+  self-consistent X landed outside the vessel). Consequence chain, derived + measured:
+  kwall 1.66e8→7.18e7 (margin 2.19, near design intent), **γ⁻¹ 47.1→19.9 ms** (in
+  class), shell-removal separation 4.7× (test bound 5→4, receipted), open-loop death
+  ~96 ms. CURRICULUM FIX: the vde kick was a bare z teleport storing artificial
+  screen energy — rang the regularization artifact at ~28 m/s and killed ~50% of
+  seeds gain-independently under the amended vessel (kick-size-invariant, forensics
+  ledgered); replaced by `kick_state` flux-conserving slow-manifold displacement
+  (ΔI = −M⁻¹c Δz). Result: 20/20 at the ORIGINAL 60 mm and ORIGINAL gains (Kpz 5e4,
+  Kdz 200 — unchanged through both physics upgrades); kicks tokenize 15/20 (the ring
+  had inflated S10's 20/20 — restated); tracker NIS ~40 held-runs (the model-based
+  EKF slice owns χ² consistency). `Kivs` droop lever added to the null's vocabulary
+  (parsed, default 0, unused). PRE-REGISTERED OWNERSHIP: the D-024 pipeline slice
+  rewires run_sim's k_dest source from the fixed-boundary derive onto the free
+  solver at 200 Hz + brings coil circuit L-R dynamics into the sim; the fixed-
+  boundary path then becomes the verification harness. Receipts
+  runs/m1s4-freeboundary-2026-08-09.md + runs/m1s4/. ctest 7/7.

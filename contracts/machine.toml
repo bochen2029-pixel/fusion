@@ -13,6 +13,10 @@
 R0_m       = 1.85    # major radius
 a_m        = 0.57    # minor radius (aspect ratio A = 3.25, epsilon = 0.308)
 kappa_sep  = 1.85    # separatrix elongation (shaping / GS boundary target)
+                     # D-039: FUSOR-1 is DOUBLE-NULL — up-down symmetric separatrix,
+                     # X-points at the Miller top/bottom vertices (~1.594, +-1.054).
+                     # Keeps the equilibrium at Z=0, consistent with the tier-1 rigid
+                     # vertical model; single-null is a later scenario-class extension.
 kappa_area = 1.65    # AREA elongation kappa_a = S/(pi a^2) — THE kappa IPB98 uses
                      # (PHY-09: the classic implementation bug is using kappa_sep here)
 delta      = 0.45    # triangularity
@@ -65,32 +69,55 @@ n_min_e20          = 0.3    # low-density floor (runaway-prone / L-mode collapse
 # PHY-03/CTL-01: without this structure the axisymmetric vertical mode is ideal-MHD
 # (Alfvén-fast, uncontrollable). With it, gamma is set by the wall L/R time.
 b_over_a           = 1.35   # effective wall minor radius / plasma minor radius
-kappa_shell        = 1.5    # vessel shell elongation (D-038: promoted from an implicit
-                            # slice-1 code constant to a pinned machine value)
+kappa_shell        = 1.9    # vessel shell elongation (D-038 promoted the implicit 1.5;
+                            # D-039 AMENDS to 1.9: the free-boundary solver exposed that
+                            # a 1.5-elongation shell cannot contain the pinned DN
+                            # separatrix — the target X (Z 1.054) had 3.5 cm clearance
+                            # and the self-consistent X landed OUTSIDE the vessel. The
+                            # shell now follows the plasma (SPARC-like D-vessel); gamma
+                            # re-derives downstream, as the report-only law intends.
 tau_wall_ms        = 25.0   # vessel L/R time (thick double-shell, SPARC-flavored choice)
                             # D-038: the tier-1 model calibrates its ONE resistive scalar
                             # so the vertical-SCREENING eigenmode carries this tau; the
                             # mode spectrum, k_wall and gamma are then derived, reported
 n_passive_filaments = 24    # axisymmetric filament circuits in the tier-1 model
+wall_over_a        = 1.25   # first-wall contour = Miller boundary scaled 1.2x (the
+                            # limiter fallback surface and plasma-region bound (D-039;
+                            # 1.2 grazed the DN separatrix — measured, widened 1.25)
                             # (full mutual-inductance matrix M_pp/M_pc/M_p-plasma; built
                             # GENERAL so it also carries quench eddy/halo forces later)
 # --- gamma, derived (never configured — PHY-03 rule) -------------------------------
 # The tier-1 code REPORTS gamma from the eigenproblem at each equilibrium; it moves with
-# l_i and kappa through the ramp. Design-point expectation from this vessel:
-#   gamma^-1 ≈ tau_wall · m_s ≈ 25 ms · ~1.0–1.6 (stability margin at kappa_sep 1.85,
-#   b/a 1.35) ≈ 25–40 ms — squarely the wall-set 10–100 ms class (D-016).
-# Control-rate justification (PHY-02's honest form): 10 kHz vertical loop = 250–400
+# l_i and kappa through the ramp. MEASURED at the D-039 vessel (kappa_shell 1.9, full
+# mutual matrix, equilibrium-derived k_dest): gamma^-1 = 19.9 ms wall-set — in the
+# 10–100 ms class (D-016); margin k_wall/k_dest = 2.19 (near the m_s ~1.0–1.6 design
+# intent; the pre-amendment 1.5 shell measured 47 ms at margin 5 — receipts m1s3/m1s4).
+# Control-rate justification (PHY-02's honest form): 10 kHz vertical loop = ~200
 # samples per e-folding — chosen for disturbance rejection and actuator-lag headroom,
 # NOT because the instability is millisecond-scale. It is not.
-# Demo timing that derives from this: mm-scale seed → wall contact (~5–6 e-foldings)
-# ≈ 150–300 ms with VS off — the §6 toggle scene shows a WATCHABLE catastrophe (PHY-17).
+# Demo timing that derives from this: mm-scale seed → wall contact measured ~100 ms
+# with VS off — the §6 toggle scene shows a WATCHABLE catastrophe (PHY-17).
 
 [coils]             # actuated circuits, v1 set (12): 3 CS modules + 4 PF up/down pairs + VS pair
 # scenario-scale electrical parameters; per-circuit L-R + mutuals live in the tier-1 model
 names        = ["CS1","CS2","CS3","PF1U","PF1L","PF2U","PF2L","PF3U","PF3L","PF4U","PF4L","VS1"]
-i_max_kAt    = [ 24,   24,   24,   14,    14,    14,    14,    10,    10,    8,     8,     10 ]
+# D-039 unit correction: the original key name "i_max_kAt" mislabeled these values as
+# ampere-turns; they are CONDUCTOR kA (the VS1 entry was always 10 kA x 20 turns in the
+# vertical model). Circuit capability = i_max_kA x turns; an 8.5 MA plasma needs
+# MAt-scale shaping circuits (ITER PF class 2-10 MAt) — the inverse fit measured it.
+i_max_kA     = [ 24,   24,   24,   14,    14,    14,    14,    10,    10,    8,     8,     10 ]
+turns        = [ 550,  550,  550,  300,   300,   250,   250,   300,   300,   250,   250,   20 ]
 v_max_V      = [ 1000, 1000, 1000, 600,   600,   600,   600,   600,   600,   600,   600,   2000 ]
 # VS1 is the in-vessel fast vertical pair (anti-series, low inductance, the 10 kHz actuator).
+# --- coil geometry (D-039: pinned for the free-boundary solver; synthetic, SPARC-
+# proportioned like everything else in FUSOR-1). The design-feasibility check is the
+# inverse isoflux fit landing WITHIN i_max_kAt at the reference flat-top — receipted.
+# CS modules are stacks modeled as 3 sub-rings at z and z +- half_h; PF coils are single
+# rings; the VS1 row is the anti-series pair at (r, +-z) — the SAME geometry vertical.h
+# consumes (one source; was a hard-code, promoted here).
+r_m          = [ 0.60, 0.60, 0.60,  1.55,  1.55,  1.90,  1.90,  2.90,  2.90,  3.15,  3.15,  2.477 ]
+z_m          = [ 0.80, 0.00, -0.80, 1.50, -1.50,  1.95, -1.95,  1.30, -1.30,  0.55, -0.55,  0.684 ]
+half_h_m     = [ 0.27, 0.27, 0.27,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0 ]
 cs_flux_swing_Wb = 40.0   # volt-second budget; ramp consumes ~17 Wb
                           # (mu0 R Ip (l_i/2 + C_Ejima) with l_i 0.9, C_E 0.4), rest = flat-top
 
