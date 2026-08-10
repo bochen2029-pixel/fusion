@@ -623,3 +623,33 @@ cross-session with the operator ratifying.*
   Deferred to S19: the stepwise action-injection API for PPO (step() currently runs the
   in-binary null; the net's action hook lands with the trainer), the per-seed MPPI/CEM
   teacher, and the CUDA port of step() (the tick loop is now a clean unit to port).
+- **D-049 · 2026-08-10 · M2 slice S19 — the net inference substrate (the residual-on-LQG
+  runtime, before the training; relay Q1/Q15/Q18/Q19).** The ship-runtime-before-you-train
+  pattern (as S16 built the LQ before tuning, S18 built the plant before batching): the
+  net's INFERENCE path, export, KAT, budget, and fence — verified bit-identical at zero
+  weights — so trained weights (S20+) slot in with no plumbing risk. `control/net.h`
+  `NetMLP`: a flat-weight MLP loaded from the byte file the trainer exports
+  (trainer/export_net.py), CPU, FIXED-ORDER dot products (/fp:strict — bit-reproducible,
+  CTL-32). Depth pinned at 2 hidden layers (spec §3); WIDTH lives in the file header (a
+  trainer sweep, CTL-36) — v1 = 64 (FORWARD_NOTES §5 budget-safe). FENCE-LEGAL: net.h
+  includes ONLY std, reads ONLY the float obs vector; added to statecheck FENCE_TUS
+  (closure walked, token-scanned — clean). ARCHITECTURE (relay Q1/Q15): residual-on-LQG —
+  policy_vs computes u = -K(kd)(x_hat with a NET Z-REFERENCE OFFSET) (the offset, not a raw
+  voltage residual: the LQG converts it to the near-rail phase-lead voltage the regime
+  needs; bounded +/-10 mm). Input (relay Q19): 6 fence-legal features — z/v/q_s/i_vs
+  estimates + the observer's k_dest + the RAW calibrated innovation nu/sqrt(S) (relay Q6:
+  raw, not the gate's drifting ratio) — 3-frame stacked (CTL-18) = 18 inputs; PolicyState
+  holds the frame ring. nullptr net OR zero weights => zero offset => the pure LQG null.
+  **MEASURED (receipt runs/m2s19-net-2026-08-10.md):** KAT — the exported flat weights load
+  into net.h and reproduce the exporter's output to 9e-9 (float32 arithmetic; Python<->C++
+  agreement + regression golden); zero weights -> 0 output exactly; a zero-net sim run is
+  **BIT-IDENTICAL to the pure null** across 3 seeds (the residual path is zero-cost-to-
+  trajectory at zero weights). BUDGET (§7.4, the relay Q18 concern): retune+step+EKF+
+  policy_vs[LQ+net] p99.9 = **11.2 us** of the 50 us tick (the net adds ~7 us over the LQ's
+  3.8; 4.5x headroom — the FORWARD_NOTES §5 estimate confirmed, no framework runtime). VertObs
+  gained innov_norm; SimInputs gained `const NetMLP* net`. ctest 11/11 -> **12/12** (net_runtime).
+  DEFERRED to S20: the trained weights themselves need the MPPI/CEM teacher + solver-then-
+  distill (relay Q16 — the teacher's decorrelated-stream requirement, D-011's clairvoyance
+  trap, is subtle enough to warrant its own slice with fresh context, per the M1 instance's
+  "budget it as a real slice" — relay Q25.5); a burn-channel residual head (relay Q15); the
+  raw-actuator/e2e stretch arm (rung c, D-044a).

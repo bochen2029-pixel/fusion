@@ -38,6 +38,10 @@ struct VertObs {
     // D-041/D-042): the equilibrium solve behind it consumes plant-side beta_p/alpha
     // ("reconstruction assumed good"); routed through this frame struct so the
     // statecheck fence sees it — never a side channel.
+    double innov_norm = 0.0;// M2 S19 (D-049): the calibrated innovation nu/sqrt(S) — the
+    // one channel that reveals contingency without naming it (CTL-21). RAW nu/sqrt(S),
+    // not the gate's ratio-to-floor (relay Q6: the floor drifts across long episodes;
+    // feed the net the stationary quantity). The net's anticipatory input.
 };
 
 struct BurnCmd { double Paux_cmd_W; double Sgas_cmd; };

@@ -43,7 +43,8 @@ BurnCmd policy_burn(const BurnObs& o, const GainsCfg& k, const MachineCfg& m,
     return BurnCmd{ p, sg };                   // governor floors apply PLANT-SIDE
 }
 
-double policy_vs(const VertObs& o, const GainsCfg& k, PolicyState& st) {
+double policy_vs(const VertObs& o, const GainsCfg& k, PolicyState& st,
+                 const NetMLP* net) {
     if (k.lq_on && k.lq_n >= 2) {
         // D-045: the LQG vertical null. u = -K(kd)*xhat on all four EKF states — K
         // linearly interpolated over the k_dest schedule (the observer's applied
@@ -53,13 +54,40 @@ double policy_vs(const VertObs& o, const GainsCfg& k, PolicyState& st) {
         const int n = k.lq_n;
         int i = 0;
         while (i < n - 2 && o.k_dest_sched > k.lq_kd[i + 1]) ++i;
-        const double lo = k.lq_kd[i], hi = k.lq_kd[i + 1];
-        const double w = std::clamp((o.k_dest_sched - lo) / (hi - lo), 0.0, 1.0);
+        const double w = std::clamp((o.k_dest_sched - k.lq_kd[i]) /
+                                    (k.lq_kd[i + 1] - k.lq_kd[i]), 0.0, 1.0);
         const double Kz = k.lq_Kz[i] + w * (k.lq_Kz[i + 1] - k.lq_Kz[i]);
         const double Kv = k.lq_Kv[i] + w * (k.lq_Kv[i + 1] - k.lq_Kv[i]);
         const double Kq = k.lq_Kq[i] + w * (k.lq_Kq[i + 1] - k.lq_Kq[i]);
         const double Kk = k.lq_Ki[i] + w * (k.lq_Ki[i + 1] - k.lq_Ki[i]);
-        return std::clamp(-(Kz * o.z_est + Kv * o.v_est + Kq * o.q_s_est
+        // D-049: the residual-on-LQG net. It outputs a Z-REFERENCE OFFSET (relay Q15 —
+        // the LQG converts it to the phase-lead voltage the near-rail regime needs, not a
+        // weak raw-voltage residual). nullptr OR zero weights => z_off = 0 => the pure
+        // LQG null (bit-identical — the ship-runtime-before-train proof).
+        double z_off = 0.0;
+        if (net && net->loaded && net->n_in == NetVertCfg::NIN && net->n_out == 1) {
+            // the 6 features, scaled to O(1) (the trainer contract — export_net.py matches)
+            const float f[NetVertCfg::NFEAT] = {
+                float(o.z_est * 100.0), float(o.v_est), float(o.q_s_est * 1e-3),
+                float(o.i_vs_est_A * 1e-2), float(o.k_dest_sched / 2.5e7),
+                float(o.innov_norm) };
+            // shift the 3-frame ring (newest last); prime => fill all frames on tick 0
+            const int F = NetVertCfg::NFEAT;
+            if (!st.obs_primed) {
+                for (int fr = 0; fr < NetVertCfg::NFRAME; ++fr)
+                    for (int j = 0; j < F; ++j) st.obs_hist[fr * F + j] = f[j];
+                st.obs_primed = true;
+            } else {
+                for (int j = 0; j < (NetVertCfg::NFRAME - 1) * F; ++j)
+                    st.obs_hist[j] = st.obs_hist[j + F];
+                for (int j = 0; j < F; ++j)
+                    st.obs_hist[(NetVertCfg::NFRAME - 1) * F + j] = f[j];
+            }
+            float out = 0.0f;
+            net->forward(st.obs_hist, &out);
+            z_off = std::clamp(double(out), -1.0, 1.0) * NetVertCfg::Z_OFF_BOUND;
+        }
+        return std::clamp(-(Kz * (o.z_est - z_off) + Kv * o.v_est + Kq * o.q_s_est
                             + Kk * o.i_vs_est_A), -2000.0, 2000.0);
     }
     // D-040: 60 Hz derivative filter on the rate estimate (the artifact stays out of

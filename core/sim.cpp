@@ -239,13 +239,18 @@ bool SimEnv::step() {
         // observer-in-the-loop (CTL-11/21): the VS PD feeds back the EKF ESTIMATE
         double Vcmd = 0.0;
         if (sc.vs_on) {
-            // D-045: the LQG taps (EKF q_s/I_vs estimates) + the OBSERVER'S applied k_dest
+            // D-045: the LQG taps (EKF q_s/I_vs estimates) + the OBSERVER'S applied k_dest.
+            // D-049: + the calibrated innovation nu/sqrt(S) (last update — 1-tick lag) as
+            // the net's contingency feature; in.net (nullptr => pure null) is the residual.
+            const double innorm = vekf.innov_last /
+                                  std::sqrt(vekf.S_last > 1e-30 ? vekf.S_last : 1e-30);
             const VertObs vo{ k.vs_truth ? xvert[0] : vekf.xz,
                               k.vs_truth ? xvert[1] : vekf.xv,
                               i_meas_prev,
                               vekf.x[2], vekf.x[3],
-                              vnom.k_dest };
-            Vcmd = policy_vs(vo, k, pst);
+                              vnom.k_dest,
+                              innorm };
+            Vcmd = policy_vs(vo, k, pst, in.net);
         }
         vmod.step_rk4(xvert, Vcmd, DT_TICK);
         Vcmd_applied = Vcmd;

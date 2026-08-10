@@ -72,10 +72,13 @@ struct RunResult {
 };
 
 struct FreeContext;                 // gs_free.h (D-041): tables + converged seed state
+struct NetMLP;                      // control/net.h (D-049): the residual-on-LQG net;
+                                    // fence-legal, loaded by the caller, passed to policy_vs
 
 struct SimInputs {
     MachineCfg m; FloorsCfg f; GatesCfg g; DispersionsCfg d; ScenarioCfg s; GainsCfg k;
     InnovCfg ic;                    // events.toml [innovation] (M1 slice 1)
+    const NetMLP* net = nullptr;    // D-049: null => the pure null; set => residual-on-LQG
     VertDerived vd;                 // fixed-boundary derive (D-038) — since D-041 the
                                     // VERIFICATION cross-check; the runtime k_dest
                                     // source is the free-boundary context below.
