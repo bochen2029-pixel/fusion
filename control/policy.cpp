@@ -44,6 +44,24 @@ BurnCmd policy_burn(const BurnObs& o, const GainsCfg& k, const MachineCfg& m,
 }
 
 double policy_vs(const VertObs& o, const GainsCfg& k, PolicyState& st) {
+    if (k.lq_on && k.lq_n >= 2) {
+        // D-045: the LQG vertical null. u = -K(kd)*xhat on all four EKF states — K
+        // linearly interpolated over the k_dest schedule (the observer's applied
+        // value, clamped to the grid ends). Replaces the PD+derivative-filter path
+        // entirely: the 60 Hz filter was a PD artifact guard, and the LQ design
+        // model CONTAINS the damped artifact (pumping absence receipted).
+        const int n = k.lq_n;
+        int i = 0;
+        while (i < n - 2 && o.k_dest_sched > k.lq_kd[i + 1]) ++i;
+        const double lo = k.lq_kd[i], hi = k.lq_kd[i + 1];
+        const double w = std::clamp((o.k_dest_sched - lo) / (hi - lo), 0.0, 1.0);
+        const double Kz = k.lq_Kz[i] + w * (k.lq_Kz[i + 1] - k.lq_Kz[i]);
+        const double Kv = k.lq_Kv[i] + w * (k.lq_Kv[i + 1] - k.lq_Kv[i]);
+        const double Kq = k.lq_Kq[i] + w * (k.lq_Kq[i + 1] - k.lq_Kq[i]);
+        const double Kk = k.lq_Ki[i] + w * (k.lq_Ki[i + 1] - k.lq_Ki[i]);
+        return std::clamp(-(Kz * o.z_est + Kv * o.v_est + Kq * o.q_s_est
+                            + Kk * o.i_vs_est_A), -2000.0, 2000.0);
+    }
     // D-040: 60 Hz derivative filter on the rate estimate (the artifact stays out of
     // the drive); the 100 us control period is a fence-side constant by law.
     const double LP_A = 1.0 - std::exp(-2.0 * 3.14159265358979 * 60.0 * 1.0e-4);

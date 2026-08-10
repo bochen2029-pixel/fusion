@@ -25,6 +25,16 @@ struct BurnObs {
 struct VertObs {
     double z_est, v_est;    // the EKF's estimates (the estimator is diagnostics-fed)
     double i_vs_meas_A;     // coil_sensors channel (one-tick latency line)
+    // M2 slice 1 (D-045): the LQG taps. All estimator outputs (fence-legal by the
+    // header's own charter); certainty equivalence wants the ESTIMATES, not raw
+    // channels.
+    double q_s_est = 0.0;   // EKF screening-mode estimate (cs-scaled coordinate)
+    double i_vs_est_A = 0.0;// EKF actuated-circuit-current estimate
+    double k_dest_sched = 0.0; // the OBSERVER'S applied k_dest [N/m] — the rtEFIT-class
+    // published value the LQ schedule keys on. STATED SIMPLIFICATION (D-045 per
+    // D-041/D-042): the equilibrium solve behind it consumes plant-side beta_p/alpha
+    // ("reconstruction assumed good"); routed through this frame struct so the
+    // statecheck fence sees it — never a side channel.
 };
 
 struct BurnCmd { double Paux_cmd_W; double Sgas_cmd; };

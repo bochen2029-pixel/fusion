@@ -83,6 +83,10 @@ static int run(int argc, char** argv) {
 
     uint64_t n = 0, good = 0, disrupt = 0, spine = 0, npass = 0;
     double q_rms_sum = 0, cost_sum = 0, minq_sum = 0; uint64_t q_n = 0;
+    // D-045: vertical-channel aggregates (GOOD runs, like q_rms) — z_rms priced under
+    // [tracking].z_position_m; smoothness fields reported for the D-044c gate metrics
+    double zrms_sum = 0, zint_sum = 0, zpeak_max = 0, veff_sum = 0; uint64_t zv_n = 0;
+    double nis_sum = 0, nis_lo = 1e300, nis_hi = 0;   // EKF consistency band (GOOD runs)
     for (uint64_t seed = s_lo; seed < s_hi; ++seed) {
         RunResult r = run_sim(in, seed, false);
         ++n;
@@ -90,6 +94,12 @@ static int run(int argc, char** argv) {
         switch (r.verdict) {
             case Verdict::GOOD: {
                 ++good; q_rms_sum += r.q_rms; minq_sum += r.minQ_window; ++q_n;
+                zrms_sum += r.z_rms; zint_sum += r.z_int_post;
+                zpeak_max = std::max(zpeak_max, r.z_peak_post);
+                veff_sum += r.v_effort; ++zv_n;
+                nis_sum += r.nis_mean;
+                nis_lo = std::min(nis_lo, r.nis_mean);
+                nis_hi = std::max(nis_hi, r.nis_mean);
                 const double sh = std::max(0.0, in.s.q_min - r.minQ_window);
                 cost += obj.minq_shortfall_w * sh * sh + (r.pass ? 0.0 : obj.gate_miss_cost);
                 break;
@@ -103,7 +113,9 @@ static int run(int argc, char** argv) {
             std::printf("  FAIL seed %llu  verdict %u  minQ %.3f  H98 %.3f  puff@%.2fs\n",
                         (unsigned long long)seed, unsigned(r.verdict), r.minQ_window,
                         r.H98_drawn, r.t_puff);
-        cost += obj.q_weight * r.q_rms * r.q_rms + obj.effort_weight * r.effort * 100.0;
+        cost += obj.q_weight * r.q_rms * r.q_rms
+              + obj.effort_weight * (r.effort + r.v_effort) * 100.0
+              + obj.z_weight * r.z_rms * r.z_rms;        // D-045: objective completed
         cost_sum += cost;
     }
     const double N = double(n ? n : 1);
@@ -112,12 +124,20 @@ static int run(int argc, char** argv) {
     if (json) {
         std::printf("{\"n\":%llu,\"good\":%llu,\"disrupt\":%llu,\"spine\":%llu,"
                     "\"pass\":%llu,\"pass_frac\":%.6f,\"wilson_lo\":%.6f,\"wilson_hi\":%.6f,"
-                    "\"q_rms_mean\":%.6f,\"minq_mean\":%.6f,\"cost_mean\":%.4f}\n",
+                    "\"q_rms_mean\":%.6f,\"minq_mean\":%.6f,\"cost_mean\":%.4f,"
+                    "\"z_rms_mean\":%.6f,\"z_int_mean\":%.6f,\"z_peak_max\":%.6f,"
+                    "\"v_eff_mean\":%.6f,\"nis_mean\":%.4f,\"nis_lo\":%.4f,"
+                    "\"nis_hi\":%.4f}\n",
                     (unsigned long long)n, (unsigned long long)good,
                     (unsigned long long)disrupt, (unsigned long long)spine,
                     (unsigned long long)npass, p_pass, lo, hi,
                     q_n ? q_rms_sum / double(q_n) : 0.0,
-                    q_n ? minq_sum / double(q_n) : 0.0, cost_sum / N);
+                    q_n ? minq_sum / double(q_n) : 0.0, cost_sum / N,
+                    zv_n ? zrms_sum / double(zv_n) : 0.0,
+                    zv_n ? zint_sum / double(zv_n) : 0.0, zpeak_max,
+                    zv_n ? veff_sum / double(zv_n) : 0.0,
+                    zv_n ? nis_sum / double(zv_n) : 0.0,
+                    zv_n ? nis_lo : 0.0, nis_hi);
     } else {
         std::printf("fusor_mc  scenario=%s  seeds=[%llu,%llu)  N=%llu\n",
                     in.s.name.c_str(), (unsigned long long)s_lo, (unsigned long long)s_hi,
@@ -130,6 +150,15 @@ static int run(int argc, char** argv) {
         std::printf("  q_rms(mean,GOOD) %.4f   minQ(mean,GOOD) %.4f   cost(mean) %.2f\n",
                     q_n ? q_rms_sum / double(q_n) : 0.0,
                     q_n ? minq_sum / double(q_n) : 0.0, cost_sum / N);
+        if (in.s.vert_on)
+            std::printf("  z_rms(mean,GOOD) %.5f m   z_int(mean,GOOD) %.5f m.s   "
+                        "z_peak(max,GOOD) %.4f m   v_eff(mean,GOOD) %.5f   "
+                        "NIS [%.2f, %.2f] mean %.2f\n",
+                        zv_n ? zrms_sum / double(zv_n) : 0.0,
+                        zv_n ? zint_sum / double(zv_n) : 0.0, zpeak_max,
+                        zv_n ? veff_sum / double(zv_n) : 0.0,
+                        zv_n ? nis_lo : 0.0, nis_hi,
+                        zv_n ? nis_sum / double(zv_n) : 0.0);
     }
     return 0;
 }
