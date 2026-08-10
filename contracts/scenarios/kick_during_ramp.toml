@@ -1,0 +1,50 @@
+# kick_during_ramp — M2 S17b (D-047). Combined event: a vde_kick lands MID-RAMP, on a
+# moving equilibrium with a drifting k_dest anchor. A fixed-gain null is "most wrong"
+# here (its gains were tuned at flat-top); the LQ schedule tracks k_dest by construction,
+# so the M1 instance predicted (relay Q12) this closes to a TIE for the composite null —
+# a no-regression guard, not expected headroom. Measured either way.
+
+[meta]
+name         = "kick_during_ramp"
+class        = "curriculum"
+description  = "vde_kick mid-rampdown; moving equilibrium, drifting k_dest anchor"
+activates_at = "M2"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 15.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[vertical]
+enabled      = true
+vs_on        = true
+
+[ramp]                     # 2.5 MA / 7.0 s = 0.357 MA/s < floors 0.85
+ip_end_MA    = 6.0
+t_start_s    = 3.0
+t_end_s      = 10.0
+
+[disturbances]
+# 60 mm kick drawn to land at t=5-8 s — inside the ramp window (t_start 3, t_end 10),
+# where k_dest is actively moving and the fixed-gain null's anchor is most stale
+events = [ { type = "vde_kick", mag_mm = 60.0, t_lo = 5.0, t_hi = 8.0 } ]
+
+[pass]
+metric       = "survival"
+q_min        = 0.6
+hold_s       = 3.0
+seed_count   = 100
+pass_frac    = 0.95
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"

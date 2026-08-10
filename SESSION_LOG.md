@@ -576,3 +576,58 @@ measured on EVAL seeds (kick psychometric sweep, combined events, the deep
 lethal-legal), pre-registered target bands, the hardened F-NULL-C grid frozen BEFORE
 any training (relay §2/§3). Then S18 (fusor_train_env + SimEnv bit-identity + ghost
 PoC). Branch `m2-cerebellum`.
+
+---
+
+## S17b · 2026-08-10 · M2 — the failure curves + the curriculum FREEZE (partial-commit; M2 open)
+
+**Done (branch `m2-cerebellum`; receipt `runs/m2s1b-curriculum-2026-08-10.md` +
+`runs/m2s1/{psycho_sweep,curriculum_measure}.txt`; D-047):** the credibility hinge — the
+null's failure curves measured on EVAL seeds (800000:899999), the F-NULL-C curriculum
+FROZEN, gate seeds untouched. New instruments: `RunResult.margin_min` (the lethal-legal
+spine — min kwall/k_dest over a run) + fusor_mc `--kick-mm` sweep affordance; ctest 9/9
+(observer-only). Five new scenarios authored + determinism-spot-checked +
+committed: `lethal_legal_{shallow,deep}`, `kick_during_ramp`, `puff_kick`,
+`sawtooth_storm`.
+
+**THE HEADROOM MAP (measured, composite null gains_m2, N=100 eval):**
+- **Isolated kick has ZERO headroom** — both nulls survive to 185 mm (2 mm from the wall)
+  at 100/100. The M1 instance's 85-100 mm knee estimate was ~2x wrong (measured, as they
+  asked). A load-bearing negative result: the psychometric band is a no-regression guard.
+- **The DEEP lethal-legal is the money scenario** — a floor-legal 0.5 MA/s rampdown walks
+  the margin to **1.04** (Ip 4.5) and a 30 mm kick lands at the bottom: **LQ survives
+  36/100 vs the old PD's 11/100 (3.3x)**. The LQ's anticipatory schedule already captures
+  much of the headroom the M1 instance predicted for the net — and 64% stays open (the
+  schedule tracks the margin but can't PRE-position for the kick; that's the net's edge).
+- **The LQ's dominance is starkest on the hard scenarios**: shallow lethal-legal both
+  98/100 but PD thrashes (v_eff 0.553, NIS 333) vs LQ glides (v_eff 0.0023, NIS 1.01) —
+  240x; kick_during_ramp both 100/100 but PD NIS 152 vs LQ 1.05. Survival ties are
+  smoothness routs.
+- puff_kick 96/100 (burn-radiative deaths; beta_p->k_dest is scaling-grade — a burn-head
+  guard); sawtooth_storm 100/100 (weak coupling — honest no-headroom probe).
+
+**THE FROZEN CURRICULUM (9 scenarios, pre-registered before any training):** guards (net
+>= 98/100) = easy, vde_kick, rampdown, hl_backtransition, kick_during_ramp,
+sawtooth_storm; separation = lethal_legal_deep (PRIMARY: net wins iff survival Wilson-LB
+> 0.458, ~55/100), lethal_legal_shallow (smoothness), puff_kick (burn-head). The final
+F-NULL-C attempt re-measures all nine on GATE seeds once.
+
+**Null result (DoD 3):** the composite null (gains_m2) is the frozen baseline; its
+measured rates ARE the bar. The isolated-kick negative result and the LQ-beats-PD-3.3x
+lethal-legal result are both receipted, either way.
+
+**Honest state:** M2 OPEN. The curriculum is frozen; the world is frozen (S17a); the null
+is the strong baseline (S16). The headroom is narrower and more concentrated than the
+relay's pre-measurement hypothesis (all in the deep lethal-legal's anticipatory regime) —
+the honest, measured map. Nothing trained yet.
+
+**Side survey (operator-requested):** `C:/nuclear` surveyed — a sibling estate project
+(Trinity implosion Monte-Carlo sim, method-rich, NO controller); transferable M2 lessons
+captured in memory `reference-nuclear-cousin` (matched-compute stats + variance-estimator
+trap, sim-vs-wall-time queue foot-gun for S18's trainer, typed reward + synthetic null
+test, generated verification oracle, no-op-path fixtures).
+
+**Next (S18): fusor_train_env + the SimEnv bit-identity refactor + the ghost PoC** — the
+batched-env runner (CPU-first), run_sim refactored to a stepwise SimEnv proven
+bit-identical (the relay Q13 surgery), the parity ctest, and the ghost fork PoC (relay
+Q23, promoted). Branch `m2-cerebellum`. Mind the sim-vs-wall-time trap (nuclear ADR-020).

@@ -558,3 +558,42 @@ cross-session with the operator ratifying.*
   the diagnostics.toml -> loaded-DiagnosticsCfg unification (all channels are still
   hardcoded-mirrors of the contract, the pre-existing convention; a future cleanup),
   and the tracking-solve rogowski variant.
+- **D-047 · 2026-08-10 · M2 slice S17b — the failure curves + the curriculum FREEZE
+  (pre-registered BEFORE any training; the project's credibility hinge — relay §2/§3,
+  FORWARD_NOTES_M2 §2).** The null's failure curves were measured on EVAL seeds
+  (800000:899999) and the F-NULL-C curriculum is FROZEN here; gate seeds (900000+) stay
+  untouched until the single F-NULL-C attempt (D-044d: the curriculum design leaks if
+  magnitudes are chosen from gate-domain measurements). New instrument:
+  `RunResult.margin_min` (min kwall/k_dest over a run — the lethal-legal spine) + fusor_mc
+  `--kick-mm` sweep affordance (committed scenario mags stay canonical; the override only
+  reaches the failure curve). **THE HEADROOM MAP (measured, composite null = gains_m2,
+  N=100 eval):** (1) **Isolated-kick psychometric curve: the null is strong nearly to the
+  wall** — PD survives 100/100 to 155 mm (wall contact 190 mm); the M1 instance's
+  85-100 mm knee estimate was wrong (they said "measure, don't trust me" — measured). So
+  the isolated kick has LITTLE headroom; the psychometric band is a no-regression guard,
+  not a battleground. MEASURED: BOTH nulls survive to 185 mm (z_peak 0.188, 2 mm from the
+  190 mm wall) at 100/100 — ZERO separation potential; the LQ just halves the effort
+  (v_eff 0.00064 vs PD 0.00124 at 185 mm). (2) **The DEEP lethal-legal is the money
+  scenario** — a floor-legal 0.5 MA/s rampdown walks the margin to **1.04** (Ip 4.5) and a
+  trivial 30 mm kick lands at the bottom. MEASURED (N=100): **LQ 36/100 survival vs PD
+  11/100 (3.3x)** — the LQ's anticipatory schedule already captures much of the headroom,
+  AND 64% still open for the net (the schedule tracks the margin but cannot PRE-position
+  for the kick — the net's edge). (3) SHALLOW lethal-legal (margin 1.32): both survive
+  98/100, but the PD THRASHES (v_eff 0.553, NIS 333) while the LQ glides (v_eff 0.0023,
+  NIS 1.01) — a 240x smoothness gulf; survival is tied, smoothness is the separation.
+  (4) kick_during_ramp: LQ 100/100 CLEAN (NIS 1.05) vs PD 100/100 PUMPING (NIS 152,
+  v_eff 0.257) — the relay Q12 tie, quantified as a smoothness rout. (5) puff_kick (burn
+  edge 0.005 + kick): both 96/100, the 4 deaths burn-radiative (the beta_p->k_dest
+  coupling is scaling-grade, relay Q25.4) — a burn-head guard, not clean cross-channel.
+  (6) sawtooth_storm: 100/100, negligible margin ripple — the sawtooth->vertical coupling
+  is weak in this model; honest no-headroom probe. **THE FROZEN F-NULL-C CURRICULUM (9
+  scenarios):** guard/no-regression class (net >= 98/100, D-044c) = easy, vde_kick,
+  rampdown, hl_backtransition, kick_during_ramp, sawtooth_storm; **separation class** =
+  lethal_legal_deep (PRIMARY: null 36/100, net wins iff survival Wilson-LB > 0.458, i.e.
+  point >= ~55/100), lethal_legal_shallow (smoothness: hold >= 98 + improve z_int vs the
+  LQ's 0.0104), puff_kick (burn-head: hold >= 96 + recover the radiative deaths). SCORING
+  CLASS (D-044c): survival-class for all vertical/combined; tracking-class (q_rms) for
+  easy only. Scenario files committed at contracts/scenarios/ (lethal_legal_{shallow,deep},
+  kick_during_ramp, puff_kick, sawtooth_storm); mags/timings are FROZEN — changing one = a
+  superseding D-entry. The FINAL F-NULL-C attempt re-measures all nine on GATE seeds once.
+  ctest 9/9 (margin_min observer-only; new scenarios determinism-spot-checked).

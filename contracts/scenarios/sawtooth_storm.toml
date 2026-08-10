@@ -1,0 +1,47 @@
+# sawtooth_storm — M2 S17b (D-047). EXPLORATORY (relay Q12's bonus headroom idea). The
+# sawtooth crash is state-triggered (q0 < 1, Porcelli); each crash steps beta_p/alpha ->
+# k_dest steps while the VS may be mid-dance. The crashes are DETERMINISTIC in state, so
+# a net reading the innovation/sawtooth tokens can pre-compensate the crash window; the
+# null cannot (it has no sawtooth reflex). A long flat-top accumulates crashes (D-042
+# measured 7 in 30 s of easy). Honest expectation: the current model's sawtooth->vertical
+# coupling may be too weak to yield measurable headroom — published either way.
+
+[meta]
+name         = "sawtooth_storm"
+class        = "curriculum"
+description  = "long flat-top; emergent sawtooth crashes step k_dest while the VS holds"
+activates_at = "M2"
+
+[phases]
+sequence     = ["flat_top"]
+duration_s   = 30.0
+
+[initial]
+Ip_MA        = 8.5
+n_bar_e20    = 3.0
+T_keV        = 8.0
+
+[control]
+T_set_keV    = 8.0
+n_set_e20    = 3.0
+q_report_set = 1.7
+
+[vertical]
+enabled      = true
+vs_on        = true
+
+[disturbances]
+events = []                # no exogenous disturbance — the sawteeth are STATE-triggered
+                           # (the point: the vertical channel rides self-generated k_dest
+                           # steps, no scheduled randomness — the innovation lane's diet)
+
+[pass]
+metric       = "survival"
+q_min        = 0.8
+hold_s       = 5.0
+seed_count   = 100
+pass_frac    = 0.95
+ci           = "wilson95"
+
+[dispersions]
+profile      = "default"

@@ -33,6 +33,10 @@ int main(int argc, char** argv) {
 static int run(int argc, char** argv) {
     std::string root = ".", scen_path, gains_path, goldens_dir;
     uint64_t s_lo = 0, s_hi = 0; long long dump_seed = -1; bool json = false, vfails = false;
+    double kick_mm_override = -1.0;      // D-047: psychometric-sweep affordance (the
+                                         // committed scenario's mag stays canonical;
+                                         // this only reaches the null's failure curve,
+                                         // measured on EVAL seeds — never a gate run)
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> std::string { return (i + 1 < argc) ? argv[++i] : ""; };
@@ -42,6 +46,7 @@ static int run(int argc, char** argv) {
         else if (a == "--goldens-dir") goldens_dir = next();
         else if (a == "--json") json = true;
         else if (a == "--verbose-fails") vfails = true;
+        else if (a == "--kick-mm") kick_mm_override = std::atof(next().c_str());
         else if (a == "--dump-golden") dump_seed = std::atoll(next().c_str());
         else if (a == "--seeds") {
             std::string v = next(); auto p = v.find(':');
@@ -63,6 +68,11 @@ static int run(int argc, char** argv) {
     if (in.s.vert_on) {
         in.vd = gs_vertical_derive(in.m);       // fixed-boundary cross-check (D-038)
         in.fctx = gs_free_context(in.m);        // the runtime source, once (D-041)
+    }
+    if (kick_mm_override >= 0.0) {               // D-047 psychometric sweep
+        if (!in.s.vde_kick) { std::fprintf(stderr,
+            "fusor_mc: --kick-mm requires a scenario with a vde_kick event\n"); return 2; }
+        in.s.kick_mm = kick_mm_override;
     }
     const ObjectiveCfg obj = load_objective(root + "/contracts/objective.toml");
 
@@ -87,9 +97,12 @@ static int run(int argc, char** argv) {
     // [tracking].z_position_m; smoothness fields reported for the D-044c gate metrics
     double zrms_sum = 0, zint_sum = 0, zpeak_max = 0, veff_sum = 0; uint64_t zv_n = 0;
     double nis_sum = 0, nis_lo = 1e300, nis_hi = 0;   // EKF consistency band (GOOD runs)
+    double margin_min_all = 1e300;                    // D-047: the lethal-legal spine —
+    double margin_min_good = 1e300;                   // min kwall/k_dest reached
     for (uint64_t seed = s_lo; seed < s_hi; ++seed) {
         RunResult r = run_sim(in, seed, false);
         ++n;
+        if (r.margin_min > 0.0 && r.margin_min < margin_min_all) margin_min_all = r.margin_min;
         double cost = 0;
         switch (r.verdict) {
             case Verdict::GOOD: {
@@ -100,6 +113,8 @@ static int run(int argc, char** argv) {
                 nis_sum += r.nis_mean;
                 nis_lo = std::min(nis_lo, r.nis_mean);
                 nis_hi = std::max(nis_hi, r.nis_mean);
+                if (r.margin_min > 0.0 && r.margin_min < margin_min_good)
+                    margin_min_good = r.margin_min;
                 const double sh = std::max(0.0, in.s.q_min - r.minQ_window);
                 cost += obj.minq_shortfall_w * sh * sh + (r.pass ? 0.0 : obj.gate_miss_cost);
                 break;
@@ -127,7 +142,7 @@ static int run(int argc, char** argv) {
                     "\"q_rms_mean\":%.6f,\"minq_mean\":%.6f,\"cost_mean\":%.4f,"
                     "\"z_rms_mean\":%.6f,\"z_int_mean\":%.6f,\"z_peak_max\":%.6f,"
                     "\"v_eff_mean\":%.6f,\"nis_mean\":%.4f,\"nis_lo\":%.4f,"
-                    "\"nis_hi\":%.4f}\n",
+                    "\"nis_hi\":%.4f,\"margin_min_all\":%.4f,\"margin_min_good\":%.4f}\n",
                     (unsigned long long)n, (unsigned long long)good,
                     (unsigned long long)disrupt, (unsigned long long)spine,
                     (unsigned long long)npass, p_pass, lo, hi,
@@ -137,7 +152,9 @@ static int run(int argc, char** argv) {
                     zv_n ? zint_sum / double(zv_n) : 0.0, zpeak_max,
                     zv_n ? veff_sum / double(zv_n) : 0.0,
                     zv_n ? nis_sum / double(zv_n) : 0.0,
-                    zv_n ? nis_lo : 0.0, nis_hi);
+                    zv_n ? nis_lo : 0.0, nis_hi,
+                    (margin_min_all < 1e299) ? margin_min_all : 0.0,
+                    (margin_min_good < 1e299) ? margin_min_good : 0.0);
     } else {
         std::printf("fusor_mc  scenario=%s  seeds=[%llu,%llu)  N=%llu\n",
                     in.s.name.c_str(), (unsigned long long)s_lo, (unsigned long long)s_hi,
@@ -153,12 +170,14 @@ static int run(int argc, char** argv) {
         if (in.s.vert_on)
             std::printf("  z_rms(mean,GOOD) %.5f m   z_int(mean,GOOD) %.5f m.s   "
                         "z_peak(max,GOOD) %.4f m   v_eff(mean,GOOD) %.5f   "
-                        "NIS [%.2f, %.2f] mean %.2f\n",
+                        "NIS [%.2f, %.2f] mean %.2f   margin_min[all %.3f, good %.3f]\n",
                         zv_n ? zrms_sum / double(zv_n) : 0.0,
                         zv_n ? zint_sum / double(zv_n) : 0.0, zpeak_max,
                         zv_n ? veff_sum / double(zv_n) : 0.0,
                         zv_n ? nis_lo : 0.0, nis_hi,
-                        zv_n ? nis_sum / double(zv_n) : 0.0);
+                        zv_n ? nis_sum / double(zv_n) : 0.0,
+                        (margin_min_all < 1e299) ? margin_min_all : 0.0,
+                        (margin_min_good < 1e299) ? margin_min_good : 0.0);
     }
     return 0;
 }
