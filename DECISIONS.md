@@ -418,3 +418,22 @@ cross-session with the operator ratifying.*
   the lever live — k_dest tracked −11.9% (α/β_p adds −5.1% over S13's fixed-profile
   −6.8%), vde 20/20, replay green, ctest 7/7, goldens regenerated (3 seeds).
   Receipts runs/m1s7-transport-2026-08-09.md + runs/m1s7/.
+- **D-043 · 2026-08-09 · M1 slice 8 — the fence, the oracle ruling, and F-SHAPE-1
+  GREEN (M1 DONE).** THE FENCE (CTL-14b): the policy runtime moved behind
+  control/obs.h + control/policy.cpp — a TU whose include closure cannot reach the
+  true-state headers; poison guards (#error on FUSION_OBS_FENCE) in physics_tier0.h
+  and sim.h; `statecheck` ctest (include-closure walk + token scan + guard assert)
+  registered as the hard M1 gate. The refactor is BIT-IDENTICAL (golden fnv
+  unchanged — the proof). Kivs input switched to the MEASURED coil current (was
+  true-state; shipped Kivs=0 → no trajectory change). THE ORACLE RULING (CTL-26 at
+  M1): the solvability proof is CONSTRUCTIVE — the receipted CEM-tuned classical
+  controller (M0 product, gains unchanged through five physics upgrades) lands the
+  full curriculum at gate-domain seeds; the per-seed trajectory oracle
+  (MPPI/CEM-over-segments, decorrelated teacher stream) is M2's solver-then-distill
+  teacher where it is load-bearing — pre-registered there with the deep
+  lethal-legal scenario. F-SHAPE-1 VERDICT: GREEN attempt 1 (receipt
+  runs/m1-fshape1-2026-08-09.md): open-loop VDE death 0.186 s with the full token
+  chain; 100/100 × 4 scenarios at seeds 900000:900100 (Wilson LB 0.963); NIS
+  [1.29, 1.40] in [0.5, 2.0]; determinism 8/8 incl. pipeline counters. DoD clauses:
+  the organ IS the null (P-13, stated); goldens committed; ROADMAP flipped;
+  KICKOFF_M2 written; snapshot taken. M1 closes at nine slices, D-035…D-043.

@@ -4,6 +4,9 @@
 // separate channel: dW/dt = P_heat - P_rad - P_cond. kappa = kappa_area. n in the fit
 // is line-averaged in 1e19 m^-3. All receipts state this convention.
 #pragma once
+#ifdef FUSION_OBS_FENCE
+#error "statecheck fence (CTL-14b): a policy TU pulled in the true-state header"
+#endif
 #include "config.h"
 #include <cmath>
 #include <algorithm>

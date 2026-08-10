@@ -7,6 +7,7 @@
 #include "gs.h"
 #include "gs_free.h"
 #include "transport.h"
+#include "control/policy.h"
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
@@ -19,17 +20,6 @@ uint64_t fnv1a64(const void* data, size_t n, uint64_t h) {
     return h;
 }
 
-namespace {
-struct Pid {
-    double I = 0.0, e_prev = 0.0; bool primed = false;
-    double step(double e, double dt, double Kp, double Ki, double Kd, bool windup_ok) {
-        if (windup_ok) I += e * dt;
-        const double d = primed ? (e - e_prev) / dt : 0.0;
-        e_prev = e; primed = true;
-        return Kp * e + Ki * I + Kd * d;
-    }
-};
-} // namespace
 
 RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     const MachineCfg& m = in.m; const ScenarioCfg& sc = in.s; const GainsCfg& k = in.k;
@@ -95,11 +85,15 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     const uint64_t n_ticks = uint64_t(sc.duration_s / DT_TICK + 0.5);
     const uint64_t puff_tick = (t_puff > 0) ? uint64_t(t_puff / DT_TICK + 0.5) : ~0ull;
     const double dt_pid = SUBCYCLE * DT_TICK;      // 1 kHz control
-    Pid pidT, pidN;
     Cmds c{ s.Paux, s.Sgas };
-    double paux_cmd_prev = s.Paux;
     Derived d = derive(s, m, H98);
-    double prad_avg = d.Prad;                    // 5 s EMA — the rad-ff baseline (D-033)
+    // D-043: the policy runtime lives BEHIND THE FENCE (control/policy.cpp — the
+    // statecheck ctest proves its TU cannot see true state); the sim builds the
+    // observation frames from its diagnostics variables and applies plant-side
+    // governor floors to the returned commands.
+    PolicyState pst{};
+    pst.paux_cmd_prev_W = s.Paux;
+    pst.prad_avg_W = d.Prad;                     // 5 s EMA — the rad-ff baseline (D-033)
 
     enum Mode : uint32_t { RUN = 0, TQ = 2, CQ = 3 };
     uint32_t mode = RUN;
@@ -130,13 +124,8 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     double zlat[2] = {0, 0}, ilat[1] = {0};    // diagnostics.toml latency lines (D-040):
                                                // magnetics 2 ticks, coil_sensors 1 tick
     double Vcmd_applied = 0.0;
-    double fv_lp = 0.0;                        // D-040: derivative-filtered rate feedback
-    // (60 Hz first-order on the estimate's v — between the slow mode ~8 Hz and the
-    // 180 Hz regularization artifact. The model-based xv is FAITHFUL, artifact
-    // included; raw-rate PD through the 10 ms lag pumps the artifact — measured.
-    // The α-β tracker's sluggish xv was an accidental low-pass; this is the honest,
-    // stated version of the same shaping. Textbook derivative filtering, not LQ.)
-    const double LP_A = 1.0 - std::exp(-2.0 * 3.14159265358979 * 60.0 * DT_TICK);
+    double i_meas_prev = 0.0;                  // last coil-current measurement (the
+                                               // policy's Kivs input; D-040/D-043)
     const InnovCfg icfg = in.ic;       // events.toml [innovation], loaded by the caller
     // D-041: the free-boundary equilibrium is the RUNTIME k_dest source (D-039's
     // pre-registered rewiring; the fixed-boundary derive is now the verification
@@ -259,12 +248,12 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             // observer-in-the-loop (CTL-11/21): the VS PD feeds back the EKF ESTIMATE
             double Vcmd = 0.0;
             if (sc.vs_on) {
-                const double fz = k.vs_truth ? xvert[0] : vekf.xz;
-                const double fv = k.vs_truth ? xvert[1] : vekf.xv;
-                fv_lp += LP_A * (fv - fv_lp);         // derivative filter (D-040, above)
-                Vcmd = std::clamp(-(k.Kpz * fz + k.Kdz * fv_lp
-                                    + k.Kivs * xvert[2 + VerticalModel::NP]),
-                                  -2000.0, 2000.0);   // I_vs is a measured coil channel
+                // observation build: truth injection is a SIM-SIDE dev affordance
+                // (CTL-11); the policy cannot tell — the fence stands either way
+                const VertObs vo{ k.vs_truth ? xvert[0] : vekf.xz,
+                                  k.vs_truth ? xvert[1] : vekf.xv,
+                                  i_meas_prev };
+                Vcmd = policy_vs(vo, k, pst);
             }
             vmod.step_rk4(xvert, Vcmd, DT_TICK);
             Vcmd_applied = Vcmd;
@@ -279,6 +268,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
             const double i_meas = ilat[0] + 20.0 * gi.g0;
             zlat[tick % 2] = xvert[0];                     // 2-tick ring
             ilat[0] = xvert[2 + VerticalModel::NP];        // 1-tick line
+            i_meas_prev = i_meas;
             vekf.predict(Vcmd_applied, DT_TICK);           // the controller's own output
             vekf.update(z_meas);
             vekf.update_i(i_meas);
@@ -326,25 +316,12 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
                                      uint32_t((tick / SUBCYCLE) & 0xFFFFFFFFu));
             const double T_obs = (T_obs_prev / ece_cal) * (1.0 + 0.03 * gd.g0);
             const double n_obs = n_obs_prev + 0.03e20 * gd.g1;
-            // ---- the null controller (1 kHz): T-loop -> P_aux, n-loop -> S_gas ----
-            const double Pmax = m.P_aux_max_MW * 1e6;
-            const double eT = sc.T_set_keV - T_obs;
-            const bool ok_T = (s.Paux > 1e5 && s.Paux < Pmax * 0.999) ||
-                              (eT > 0) == (s.Paux < Pmax * 0.5);
-            // D-033: bolometric radiation feedforward — counter the measured loss NOW,
-            // before T moves (the pure-PID near-miss band was exactly this lag)
-            prad_avg += (d.Prad - prad_avg) * (dt_pid / 5.0);
-            const double rad_ff = k.Krad * std::max(0.0, d.Prad - prad_avg);
-            double p = (k.P_ff_MW + pidT.step(eT, dt_pid, k.Kp, k.Ki, k.Kd, ok_T)) * 1e6
-                     + rad_ff;
-            if (vde_gate_fired) p = 0.0;               // gate response: bound the energy
-            p = std::clamp(p, 0.0, Pmax);
-            const double slew = m.slew_MW_per_s * 1e6 * dt_pid;              // rate floor
-            p = std::clamp(p, paux_cmd_prev - slew, paux_cmd_prev + slew);
-            paux_cmd_prev = p; c.Paux_cmd = p;
-            const double en = sc.n_set_e20 - n_obs / 1e20;
-            double sg = (k.S_ff_e20 + pidN.step(en, dt_pid, k.Kpn, k.Kin, 0.0, true)) * 1e20;
-            sg = std::clamp(sg, 0.0, m.S_gas_max_e20 * 1e20);
+            // ---- the null controller (1 kHz), BEHIND THE FENCE (D-043) ----
+            const BurnObs bo{ T_obs, n_obs, d.Prad, s.Paux,
+                              sc.T_set_keV, sc.n_set_e20, !vde_gate_fired };
+            const BurnCmd bc = policy_burn(bo, k, m, pst, dt_pid);
+            c.Paux_cmd = bc.Paux_cmd_W;
+            double sg = bc.Sgas_cmd;
             // ---- governor floors (M0-active; D-041: the Greenwald boundary tracks
             // the LIVE Ip — n_GW = Ip/(pi a^2) is Ip-proportional; never binds in the
             // committed tier-0 goldens' regime, verified by golden_check) ----
@@ -434,6 +411,7 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
                 tq_ticks_left = int(m.tauTQ_ms * 1e-3 / DT_TICK + 0.5);
                 ev(tick, EvKind::TerminalTQ, 0, d.T, d.frad); }
             // ctrl saturation event (events.toml [controller].saturation_min_s)
+            const double Pmax = m.P_aux_max_MW * 1e6;
             const bool at_cap = s.Paux >= 0.999 * Pmax;
             if (at_cap && sat_since == ~0ull) { sat_since = tick; sat_reported = false; }
             if (!at_cap && sat_since != ~0ull) {

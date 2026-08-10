@@ -5,7 +5,7 @@ project(fusion LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(fusion_core STATIC core/config.cpp core/sim.cpp)
+add_library(fusion_core STATIC core/config.cpp core/sim.cpp control/policy.cpp)
 target_include_directories(fusion_core PUBLIC ${CMAKE_SOURCE_DIR}
                            ${CMAKE_SOURCE_DIR}/third_party/tomlplusplus)
 if(MSVC)
@@ -67,4 +67,8 @@ if(Python3_FOUND)
   # seedcheck: the trainer's gate-seed guard must refuse eval/gate domains (CTL-12)
   add_test(NAME seedcheck COMMAND ${Python3_EXECUTABLE}
            ${CMAKE_SOURCE_DIR}/trainer/tune_pid.py --selftest-seed-guard)
+  # statecheck (CTL-14b, hard M1 gate): the policy TU's include closure cannot reach
+  # the true-state headers; token scan backs it; the poison guards must exist.
+  add_test(NAME statecheck COMMAND ${Python3_EXECUTABLE}
+           ${CMAKE_SOURCE_DIR}/tools/statecheck.py ${CMAKE_SOURCE_DIR})
 endif()

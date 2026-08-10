@@ -1,5 +1,8 @@
 // core/sim.h — one deterministic run: integrator + governor + gates + verdict + golden.
 #pragma once
+#ifdef FUSION_OBS_FENCE
+#error "statecheck fence (CTL-14b): a policy TU pulled in the true-state header"
+#endif
 #include "config.h"
 #include "physics_tier0.h"
 #include <vector>

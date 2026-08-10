@@ -4,7 +4,7 @@ The next phase to build is the **first unchecked milestone**. A milestone is DON
 [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) — gate green with receipts, nulls reported,
 docs synced in the same commit. Spec: [FUSION_ARCHITECTURE_v0.2.md](FUSION_ARCHITECTURE_v0.2.md) §9.
 Decisions live in [DECISIONS.md](DECISIONS.md) (append-only).
-**Current kickoff: [`KICKOFF_M1.md`](KICKOFF_M1.md)** — the finishing session updates
+**Current kickoff: [`KICKOFF_M2.md`](KICKOFF_M2.md)** — the finishing session updates
 this line (P-15's structural pointer).
 
 - [x] **V0.2 — the QC-swarm revision (MANDATORY BEFORE M0; bootstrap: `KICKOFF_SPEC_V02.md`;
@@ -45,12 +45,18 @@ this line (P-15's structural pointer).
       record; Sentinel's gated would-fire on the floor-legal writ = FRESH-3's datum;
       the tokenizer null confabulates where events give citation. D-034; receipt
       `runs/m05-thesis-slice-2026-08-09.md`. M3 rescopes onto this rig.**
-- [ ] **M1 — the shape and the enemy.** Tier-1: free-boundary Grad-Shafranov (100–200 Hz)
+- [x] **M1 — the shape and the enemy.** Tier-1: free-boundary Grad-Shafranov (100–200 Hz)
       + 10 kHz linearized vertical model (D-003) + PF coil circuits + synthetic diagnostics
       + EKF innovation source (D-006) + 1-D transport + scenario set. MPPI oracle (CEM)
       proves every curriculum scenario solvable.
       **Exit:** open-loop run demonstrably disrupts (VDE); oracle lands flat-top through
       the full disturbance set; determinism suite green at tier-1.
+      **DONE 2026-08-09 — F-SHAPE-1 GREEN, attempt 1: open-loop VDE death chain on tape
+      (0.186 s); oracle (the CEM null, D-043) 100/100 on easy · vde_kick ·
+      hl_backtransition · rampdown at gate seeds (Wilson LB 0.963 each); EKF NIS
+      [1.29, 1.40] in the pre-registered [0.5, 2.0]; determinism 8/8 incl. the
+      pipeline counters and the statecheck fence. Nine slices, D-035…D-043.
+      Receipt: `runs/m1-fshape1-2026-08-09.md`.**
 - [ ] **M2 — the cerebellum.** Solver-then-distill → PPO polish on batched CUDA envs
       (2048+); flat-weight export → in-loop inference < 50 µs.
       **Exit:** **F-NULL-C** — the net beats the tuned PID+LQ null (the MPC is a later,
