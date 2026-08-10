@@ -1,26 +1,33 @@
-// core/vertical.h — M1 slice 1: THE ENEMY. The linearized vertical instability over the
-// real passive-conductor circuit model (spec v0.2 §2.1 tier-1, first element).
+// core/vertical.h — M1: THE ENEMY. The linearized vertical instability over the real
+// passive-conductor circuit model (spec v0.2 §2.1 tier-1, first element).
 //
-// Model (scaling-grade, honesty-labeled; receipts state the calibrated constants):
+// Model (scaling-grade, honesty-labeled; receipts state every derived constant):
 //   - plasma = rigid current ring (Ip) at (R0, Z), effective inertia m_eff (the massless
-//     limit's numerical regularization — stated, not hidden)
-//   - destabilizing force gradient k_dest [N/m] from the shaping quadrupole (calibrated
-//     constant; the class check is the ctest band, the VALUE is reported)
-//   - 24 passive filaments on the vessel shell (machine.toml [vessel]): true ring-ring
-//     mutual inductances (Maxwell's formula, AGM elliptic integrals), per-filament L
-//     from the ring self-inductance formula, R = L/tau_wall (each filament carries the
-//     vessel time constant; the collective anti-symmetric mode is what stabilizes)
-//   - one in-vessel VS pair (machine.toml [coils] VS1): the 10 kHz actuator
+//     limit's numerical regularization — computed to pin the screened-oscillation
+//     artifact near a stated frequency; the wall-mode gamma is insensitive to it — the
+//     ctest band enforces that)
+//   - destabilizing force gradient k_dest [N/m] — DERIVED from the shaped equilibrium's
+//     external-field decay index (gs_vertical_derive, D-038) and passed in; this file
+//     never invents it. Report-don't-configure, end-to-end (PHY-03).
+//   - 24 passive filaments on the vessel shell (machine.toml [vessel]) with the FULL
+//     mutual-inductance matrix (Maxwell ring mutuals; diagonal = ring self-inductance at
+//     an effective wire radius of half the filament spacing — the standard shell
+//     discretization). One resistive scalar (a uniform surface resistivity) calibrated
+//     so the vertical-SCREENING eigenmode carries the pinned vessel tau_wall; the mode
+//     spectrum, k_wall, and gamma are then derived and REPORTED. (Slice-1's diagonal
+//     approximation under-carried the collective screening ~20x — measured, receipted.)
+//   - one in-vessel VS pair (machine.toml [coils] VS1): the 10 kHz actuator, coupled to
+//     the shell through the same matrix (it transformer-drives vessel eddies — physical)
 //   - gamma is REPORTED from the dominant eigenvalue of the coupled linear system
-//     (power iteration, fixed count — deterministic), NEVER configured (PHY-03).
+//     (RK4 log-slope, fixed count — deterministic), NEVER configured (PHY-03).
 //
-// The EKF (D-023): a DELIBERATELY REDUCED 2-state model (Z, V) with 10% parameter
-// mismatch — the pre-registered epistemic handicap — over 4 synthetic magnetic probes
-// (sigma + bias walk per contracts/diagnostics.toml). Innovation feeds the tokenizer's
-// [innovation] vertical cluster through the events.toml windowed gate (sigma_token,
-// dwell, refractory). NIS chi^2 is the acceptance statistic.
+// The EKF (D-023): a DELIBERATELY REDUCED 2-state model (Z, V) — the pre-registered
+// epistemic handicap — over 4 synthetic magnetic probes (sigma + bias walk per
+// contracts/diagnostics.toml). Innovation feeds the tokenizer's [innovation] vertical
+// cluster through the events.toml windowed gate. NIS chi^2 is the acceptance statistic.
 #pragma once
 #include "config.h"
+#include "rings.h"
 #include "philox.h"
 #include <cmath>
 #include <algorithm>
@@ -28,138 +35,214 @@
 
 namespace fusion {
 
-// ---- complete elliptic integrals via AGM (deterministic, ~1e-12) -------------------
-inline void elliptic_ke(double k, double& K, double& E) {
-    double a = 1.0, b = std::sqrt(1.0 - k * k), c = k, sum = 0.0, pow2 = 0.5;
-    for (int i = 0; i < 40 && c > 1e-15; ++i) {
-        const double an = 0.5 * (a + b);
-        c = 0.5 * (a - b);
-        b = std::sqrt(a * b); a = an;
-        pow2 *= 2.0; sum += pow2 * c * c;
-    }
-    K = 1.5707963267948966 / a;
-    E = K * (1.0 - 0.5 * (k * k + sum));
-}
-// Maxwell: mutual inductance of coaxial rings, radii r1,r2, axial separation dz
-inline double ring_mutual(double r1, double r2, double dz) {
-    const double mu0 = 1.25663706212e-6;
-    const double k2 = 4.0 * r1 * r2 / ((r1 + r2) * (r1 + r2) + dz * dz);
-    const double k = std::sqrt(std::clamp(k2, 1e-14, 1.0 - 1e-14));
-    double K, E; elliptic_ke(k, K, E);
-    return mu0 * std::sqrt(r1 * r2) * ((2.0 / k - k) * K - (2.0 / k) * E);
-}
-inline double ring_self(double R, double aw) {
-    const double mu0 = 1.25663706212e-6;
-    return mu0 * R * (std::log(8.0 * R / aw) - 1.75);
-}
-
 struct VerticalModel {
-    // layout: x = [Z, V, I_1..I_24 (passive), I_vs] ; n = 27
-    static constexpr int NP = 24, N = NP + 3;
+    // layout: x = [Z, V, I_1..I_24 (passive), I_vs] ; n = 27; circuits = 25
+    static constexpr int NP = 24, NC = NP + 1, N = NP + 3;
     double A[N][N];                 // dx/dt = A x + B*Vcmd
     double B[N];
-    double m_eff = 30.0;            // kg — the regularization, chosen so the screened
-                                    // fast oscillation sits ~180 Hz (10 kHz-controllable,
-                                    // EKF-trackable); the wall-mode gamma is insensitive
-                                    // to it — the ctest band enforces that (documented)
-    double k_dest = 0.0;            // N/m — calibrated constant (reported in receipt)
+    double m_eff = 30.0;            // kg — the regularization; COMPUTED in build() so the
+                                    // screened fast oscillation sits near F_SCREEN_HZ
+                                    // (10 kHz-controllable, EKF-trackable), floored at
+                                    // M_EFF_FLOOR; documented, gamma-insensitive (ctest)
+    static constexpr double F_SCREEN_HZ = 180.0, M_EFF_FLOOR = 5.0;
+    double k_dest = 0.0;            // N/m — DERIVED input (gs_vertical_derive; D-038)
     double c_p[NP];                 // force per passive ampere = Ip * dM_pj/dZ [N/A]
     double c_vs = 0.0;
-    double Lp_[NP], Rp_[NP];
+    double Mfull[NC][NC];           // circuit inductance matrix [filaments..., VS]
+    double Minv[NC][NC];
+    double Rcirc[NC];               // circuit resistances (vessel scalar calibrated)
     double Lvs = 2.0e-3, Rvs = 0.2;  // 20-turn in-vessel pair: tau 10 ms, 10 kA at 2 kV
     double vs_turns = 20.0;
-    double kwall_ = 0.0;             // image-current stiffness (reported)
-    double gamma_open = 0.0;        // reported: no-passive growth rate [1/s]
-    double gamma_wall = 0.0;        // reported: with-passives growth rate [1/s]
+    double kwall_ = 0.0;             // instantaneous screening stiffness c^T Minv c (rep.)
+    double rho_shell = 0.0;          // the calibrated surface-resistivity scalar (rep.)
+    double gamma_open = 0.0;        // reported: no-shell growth rate [1/s] (VS passive)
+    double gamma_wall = 0.0;        // reported: with-shell growth rate [1/s]
 
-    void build(const MachineCfg& m) {
-        const double b_sh = m.a * 1.35;             // machine.toml [vessel] b_over_a
-        const double kap_sh = 1.5;
-        const double tau_w = 0.025;                  // tau_wall_ms/1000 — from machine
+    // ---- 25x25 SPD Cholesky (fixed order — deterministic) --------------------------
+    static bool chol(int n, const double* Min, double* L) {   // row-major n x n
+        for (int i = 0; i < n * n; ++i) L[i] = 0.0;
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j <= i; ++j) {
+                double s = Min[i * n + j];
+                for (int k = 0; k < j; ++k) s -= L[i * n + k] * L[j * n + k];
+                if (i == j) {
+                    if (s <= 0.0) return false;               // not PD — hard model error
+                    L[i * n + i] = std::sqrt(s);
+                } else L[i * n + j] = s / L[j * n + j];
+            }
+        return true;
+    }
+    static void chol_solve(int n, const double* L, const double* b, double* x) {
+        std::vector<double> y(n);
+        for (int i = 0; i < n; ++i) {
+            double s = b[i];
+            for (int k = 0; k < i; ++k) s -= L[i * n + k] * y[k];
+            y[i] = s / L[i * n + i];
+        }
+        for (int i = n - 1; i >= 0; --i) {
+            double s = y[i];
+            for (int k = i + 1; k < n; ++k) s -= L[k * n + i] * x[k];
+            x[i] = s / L[i * n + i];
+        }
+    }
+
+    void build(const MachineCfg& m, double k_dest_derived_Npm) {
+        const double PI = 3.14159265358979;
+        const double b_sh = m.a * m.b_over_a;               // machine.toml [vessel]
+        const double kap_sh = m.kappa_shell;
+        const double tau_w = m.tau_wall_s;
+        k_dest = k_dest_derived_Npm;
         // filament ring positions on the shell
         double Rf[NP], Zf[NP];
         for (int j = 0; j < NP; ++j) {
-            const double th = 2.0 * 3.14159265358979 * (j + 0.5) / NP;
+            const double th = 2.0 * PI * (j + 0.5) / NP;
             Rf[j] = m.R0 + b_sh * std::cos(th);
             Zf[j] = b_sh * kap_sh * std::sin(th);
         }
-        // plasma-filament coupling: dM/dZ by symmetric difference at Z=0 (fixed h)
+        // local filament spacing along the shell (aw = spacing/2 — the standard shell
+        // discretization; slice-1's thin-wire 0.02 m overstated the diagonal)
+        double aw[NP], ds[NP];
+        for (int j = 0; j < NP; ++j) {
+            const int jp = (j + 1) % NP, jm = (j + NP - 1) % NP;
+            const double dp = std::hypot(Rf[jp] - Rf[j], Zf[jp] - Zf[j]);
+            const double dm = std::hypot(Rf[j] - Rf[jm], Zf[j] - Zf[jm]);
+            ds[j] = 0.5 * (dp + dm);
+            aw[j] = 0.5 * ds[j];
+        }
+        // plasma-circuit coupling: dM/dZ by symmetric difference at Z=0 (fixed h)
         const double h = 1e-3, Ip = m.Ip_MA * 1e6;
-        double kwall = 0.0;
         for (int j = 0; j < NP; ++j) {
             const double dM = (ring_mutual(m.R0, Rf[j], Zf[j] - h) -
                                ring_mutual(m.R0, Rf[j], Zf[j] + h)) / (2.0 * h);
             c_p[j] = Ip * dM;                        // N/A (and V·s/m reciprocally)
-            Lp_[j] = ring_self(Rf[j], 0.02);
-            Rp_[j] = Lp_[j] / tau_w;
-            kwall += c_p[j] * c_p[j] / Lp_[j];       // image-current stiffness
         }
         // VS pair at (R0 +- a*1.1, +-a*1.2) anti-series: effective dM/dZ doubled
-        const double dMvs = (ring_mutual(m.R0, m.R0 + m.a * 1.1, m.a * 1.2 - h) -
-                             ring_mutual(m.R0, m.R0 + m.a * 1.1, m.a * 1.2 + h)) / (2.0 * h);
+        const double Rvs_r = m.R0 + m.a * 1.1, Zvs = m.a * 1.2;
+        const double dMvs = (ring_mutual(m.R0, Rvs_r, Zvs - h) -
+                             ring_mutual(m.R0, Rvs_r, Zvs + h)) / (2.0 * h);
         c_vs = 2.0 * vs_turns * Ip * dMvs;           // anti-series multi-turn pair
-        kwall_ = kwall;
-        // k_dest: calibrated to a stability margin m_s ~ 1 against the computed k_wall
-        // (the CLASS is enforced by the ctest band; gamma itself is reported)
-        k_dest = 0.45 * kwall;
-        // assemble A
+        // ---- the FULL circuit inductance matrix (filaments + VS; D-038) ------------
+        for (int i = 0; i < NP; ++i)
+            for (int j = 0; j < NP; ++j)
+                Mfull[i][j] = (i == j) ? ring_self(Rf[i], aw[i])
+                                       : ring_mutual(Rf[i], Rf[j], Zf[i] - Zf[j]);
+        for (int j = 0; j < NP; ++j) {               // VS circuit <-> filament (anti-series)
+            const double mv = vs_turns * (ring_mutual(Rvs_r, Rf[j], Zvs - Zf[j]) -
+                                          ring_mutual(Rvs_r, Rf[j], -Zvs - Zf[j]));
+            Mfull[NP][j] = Mfull[j][NP] = mv;
+        }
+        Mfull[NP][NP] = Lvs;                         // pinned pair inductance
+        // ---- vessel resistances: ONE surface-resistivity scalar, calibrated so the
+        // vertical-screening eigenmode (pattern Mff^-1 c_f) carries the PINNED tau_wall.
+        // tau_wall is machine.toml's physical input; everything downstream is derived.
+        {
+            std::vector<double> Mff(NP * NP), Lf(NP * NP), u(NP), cf(NP);
+            for (int i = 0; i < NP; ++i)
+                for (int j = 0; j < NP; ++j) Mff[i * NP + j] = Mfull[i][j];
+            for (int j = 0; j < NP; ++j) cf[j] = c_p[j];
+            const bool ok = chol(NP, Mff.data(), Lf.data());
+            if (ok) chol_solve(NP, Lf.data(), cf.data(), u.data());
+            else    for (int j = 0; j < NP; ++j) u[j] = c_p[j];   // degenerate fallback
+            double uMu = 0, uRu = 0;
+            for (int i = 0; i < NP; ++i) {
+                for (int j = 0; j < NP; ++j) uMu += u[i] * Mfull[i][j] * u[j];
+                uRu += u[i] * (2.0 * PI * Rf[i] / ds[i]) * u[i];  // geometry factor
+            }
+            rho_shell = (uRu > 0) ? uMu / (uRu * tau_w) : 1e-6;   // [ohm per square]
+            for (int j = 0; j < NP; ++j) Rcirc[j] = rho_shell * 2.0 * PI * Rf[j] / ds[j];
+        }
+        Rcirc[NP] = Rvs;
+        // ---- invert the full matrix (Cholesky columns; deterministic) --------------
+        {
+            std::vector<double> Mlin(NC * NC), Llin(NC * NC), e(NC), col(NC);
+            for (int i = 0; i < NC; ++i)
+                for (int j = 0; j < NC; ++j) Mlin[i * NC + j] = Mfull[i][j];
+            const bool ok = chol(NC, Mlin.data(), Llin.data());
+            for (int j = 0; j < NC; ++j) {
+                for (int i = 0; i < NC; ++i) e[i] = (i == j) ? 1.0 : 0.0;
+                if (ok) chol_solve(NC, Llin.data(), e.data(), col.data());
+                else    for (int i = 0; i < NC; ++i) col[i] = (i == j) ? 1.0 / Mfull[j][j] : 0.0;
+                for (int i = 0; i < NC; ++i) Minv[i][j] = col[i];
+            }
+        }
+        // instantaneous screening stiffness (superconducting-circuits limit), REPORTED
+        double cc[NC];
+        for (int j = 0; j < NP; ++j) cc[j] = c_p[j];
+        cc[NP] = c_vs;
+        kwall_ = 0.0;
+        for (int i = 0; i < NC; ++i)
+            for (int j = 0; j < NC; ++j) kwall_ += cc[i] * Minv[i][j] * cc[j];
+        // the regularization: pin the screened-oscillation artifact near F_SCREEN_HZ
+        // (documented; if the shell cannot hold the shape at all — kwall <= k_dest —
+        // the mode is beyond passive stabilization and the class test must catch it)
+        const double w_t = 2.0 * PI * F_SCREEN_HZ;
+        m_eff = (kwall_ > k_dest) ? std::max(M_EFF_FLOOR, (kwall_ - k_dest) / (w_t * w_t))
+                                  : 30.0;
+        // ---- assemble A: M dI/dt = -R I - c dZ/dt + e_vs Vcmd ----------------------
         for (int i = 0; i < N; ++i) { B[i] = 0; for (int j = 0; j < N; ++j) A[i][j] = 0; }
         A[0][1] = 1.0;
         A[1][0] = k_dest / m_eff;
         for (int j = 0; j < NP; ++j) A[1][2 + j] = c_p[j] / m_eff;
         A[1][2 + NP] = c_vs / m_eff;
-        for (int j = 0; j < NP; ++j) {               // L dI/dt = -R I - c_j * V
-            A[2 + j][2 + j] = -Rp_[j] / Lp_[j];
-            A[2 + j][1] = -c_p[j] / Lp_[j];
+        for (int i = 0; i < NC; ++i) {
+            double mc = 0.0;
+            for (int j = 0; j < NC; ++j) {
+                A[2 + i][2 + j] = -Minv[i][j] * Rcirc[j];
+                mc += Minv[i][j] * cc[j];
+            }
+            A[2 + i][1] = -mc;
+            B[2 + i] = Minv[i][NP];                  // VS drive leaks into the shell (phys.)
         }
-        A[2 + NP][2 + NP] = -Rvs / Lvs;
-        A[2 + NP][1] = -c_vs / Lvs;
-        B[2 + NP] = 1.0 / Lvs;
         gamma_wall = dominant_growth(true);
         gamma_open = dominant_growth(false);
     }
 
-    // dominant REAL growth rate: RK4-integrate x' = Ax at fine dt with periodic
-    // renormalization; the growth is the log-norm slope over the SECOND half of the
-    // window, where the unstable real mode has outgrown every transient. Deterministic
-    // (fixed dt, fixed step count). A forward-Euler map power iteration fails here —
-    // it inflates the fast oscillatory mode (a discretization artifact, receipted).
+    // dominant REAL growth rate: RK4-integrate at fine dt with periodic renormalization;
+    // the growth is the log-norm slope over the SECOND half of the window, where the
+    // unstable real mode has outgrown every transient. Deterministic (fixed dt, fixed
+    // step count). with_passives=false integrates the explicit 3-state [Z,V,I_vs]
+    // system (shell removed; the VS pair still screens passively — reported as such).
+    // A forward-Euler map power iteration fails here — it inflates the fast oscillatory
+    // mode (a discretization artifact, receipted at slice 1).
     double dominant_growth(bool with_passives) const {
         const double dt = 2e-5, T = with_passives ? 0.6 : 0.02;
         const long nsteps = (long)(T / dt);
-        double x[N]; for (int i = 0; i < N; ++i) x[i] = (i == 0) ? 1e-3 : 0.0;
+        const int n = with_passives ? N : 3;
+        double x[N]; for (int i = 0; i < n; ++i) x[i] = (i == 0) ? 1e-3 : 0.0;
         double logn = 0.0, logn_half = 0.0;
         auto deriv = [&](const double* s, double* d) {
-            for (int i = 0; i < N; ++i) {
-                if (!with_passives && i >= 2 && i < 2 + NP) { d[i] = 0; continue; }
-                double v = 0;
-                for (int j = 0; j < N; ++j) {
-                    if (!with_passives && j >= 2 && j < 2 + NP) continue;
-                    v += A[i][j] * s[j];
+            if (with_passives) {
+                for (int i = 0; i < N; ++i) {
+                    double v = 0;
+                    for (int j = 0; j < N; ++j) v += A[i][j] * s[j];
+                    d[i] = v;
                 }
-                d[i] = v;
+            } else {                                  // [Z, V, I_vs] alone
+                d[0] = s[1];
+                d[1] = (k_dest * s[0] + c_vs * s[2]) / m_eff;
+                d[2] = (-Rvs * s[2] - c_vs * s[1]) / Lvs;
             }
         };
         for (long it = 0; it < nsteps; ++it) {
             double k1[N], k2[N], k3[N], k4[N], t[N];
             deriv(x, k1);
-            for (int i = 0; i < N; ++i) t[i] = x[i] + 0.5 * dt * k1[i];
+            for (int i = 0; i < n; ++i) t[i] = x[i] + 0.5 * dt * k1[i];
             deriv(t, k2);
-            for (int i = 0; i < N; ++i) t[i] = x[i] + 0.5 * dt * k2[i];
+            for (int i = 0; i < n; ++i) t[i] = x[i] + 0.5 * dt * k2[i];
             deriv(t, k3);
-            for (int i = 0; i < N; ++i) t[i] = x[i] + dt * k3[i];
+            for (int i = 0; i < n; ++i) t[i] = x[i] + dt * k3[i];
             deriv(t, k4);
-            for (int i = 0; i < N; ++i)
+            for (int i = 0; i < n; ++i)
                 x[i] += dt / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
             if ((it & 127) == 127) {
-                double nrm = 0; for (int i = 0; i < N; ++i) nrm += x[i] * x[i];
+                double nrm = 0; for (int i = 0; i < n; ++i) nrm += x[i] * x[i];
                 nrm = std::sqrt(nrm > 0 ? nrm : 1e-300);
                 logn += std::log(nrm);
-                for (int i = 0; i < N; ++i) x[i] /= nrm;
+                for (int i = 0; i < n; ++i) x[i] /= nrm;
             }
             if (it == nsteps / 2) logn_half = logn;
         }
-        { double nrm = 0; for (int i = 0; i < N; ++i) nrm += x[i] * x[i];
+        { double nrm = 0; for (int i = 0; i < n; ++i) nrm += x[i] * x[i];
           logn += 0.5 * std::log(nrm > 0 ? nrm : 1e-300); }
         return (logn - logn_half) / (T * 0.5);
     }

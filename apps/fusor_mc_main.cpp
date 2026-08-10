@@ -2,6 +2,7 @@
 // fusor_mc --root <repo> --scenario <path> --seeds A:B [--gains <path>] [--json]
 //          [--dump-golden <seed> --goldens-dir <dir>]
 #include "core/sim.h"
+#include "core/gs.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -58,6 +59,7 @@ static int run(int argc, char** argv) {
     in.k = gains_path.empty() ? load_gains(root + "/control/gains_m0.toml")
                               : load_gains(gains_path);
     in.ic = load_innov(root + "/contracts/events.toml");
+    if (in.s.vert_on) in.vd = gs_vertical_derive(in.m);   // once per process (D-038)
     const ObjectiveCfg obj = load_objective(root + "/contracts/objective.toml");
 
     if (dump_seed >= 0) {                       // golden production path

@@ -1,11 +1,15 @@
 # KICKOFF — M1 · the shape and the enemy (bootstrap for the next session)
 
-> **STATUS 2026-08-09 (S7–S9): slices 1, 2a, 2b-1 are DONE and merged** — the enemy
+> **STATUS 2026-08-09 (S7–S10): slices 1, 2a, 2b-1, 3 are DONE and merged** — the enemy
 > (γ from the eigenproblem, VDE death chain, live innovation lane; D-035), the verified
-> Δ* core (4e-6 vs Solov'ev; D-036), and the shaped equilibrium (shift +27 mm,
-> q95 = 3.61; D-037). **Read `docs/HANDOFF_2026-08-09.md` FIRST** — it carries the
-> remaining-work order (start with the vertical↔equilibrium MERGE), the open judgment
-> calls, and the gotchas. The scope list below remains the milestone's full charter.
+> Δ* core (4e-6 vs Solov'ev; D-036), the shaped equilibrium (shift +27 mm, q95 = 3.61;
+> D-037), and **the MERGE (D-038): k_dest derived from the equilibrium's decay index
+> (n −1.047, 3.28e7 N/m), the full 25×25 mutual matrix, γ⁻¹ 47.1 ms held by real
+> physics, γ moving with κ and Ip** — report-don't-configure closed end-to-end.
+> **Read `docs/HANDOFF_2026-08-09.md` FIRST** for the day's map and gotchas (its
+> remaining-work item 1, the MERGE, is done — SESSION_LOG S10 is the tail of truth;
+> **start at item 2: free-boundary + von Hagenow + X-point**, then the D-024 pipeline).
+> The scope list below remains the milestone's full charter.
 
 **Read first, in order:** `CLAUDE.md` → `FUSION_ARCHITECTURE_v0.2.md` **§2.1 tier-1,
 §2.4, §3 (EKF + statecheck), §8 F-SHAPE-1, §9-M1** → `contracts/machine.toml` ([vessel],

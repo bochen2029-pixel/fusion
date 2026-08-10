@@ -2,6 +2,7 @@
 // CLASS, is holdable, dies honestly when unopposed, and the EKF is consistent.
 #include "core/sim.h"
 #include "core/vertical.h"
+#include "core/gs.h"
 #include <cstdio>
 #include <cmath>
 
@@ -11,17 +12,46 @@ int main(int argc, char** argv) {
     const std::string root = argc > 1 ? argv[1] : ".";
     const MachineCfg m = load_machine(root + "/contracts/machine.toml");
 
+    // (0) the MERGE (D-038): k_dest arrives from the shaped equilibrium — derived,
+    //     never configured. gamma now moves with the equilibrium through the shape.
+    const VertDerived vd = gs_vertical_derive(m);
+    std::printf("derived: n_decay %.3f  Bz_ext %.3f T  k_dest %.3e N/m  (R_axis %.3f)\n",
+                vd.n_decay, vd.Bz_ext_axis_T, vd.k_dest_Npm, vd.R_axis_m);
+
     // (1) gamma bands — REPORTED from the eigenproblem, the CLASS pre-registered:
     // wall-set 10–100 ms (machine.toml [vessel] expectation 25–40); no-wall < 2 ms.
-    VerticalModel vm; vm.build(m);
+    VerticalModel vm; vm.build(m, vd.k_dest_Npm);
     const double gi_wall = 1.0 / vm.gamma_wall, gi_open = 1.0 / vm.gamma_open;
-    std::printf("gamma^-1: with passives %.1f ms (open %.3f ms)  k_dest %.3g N/m\n",
-                gi_wall * 1e3, gi_open * 1e3, vm.k_dest);
+    std::printf("gamma^-1: with passives %.1f ms (open %.3f ms)  k_dest %.3g N/m  "
+                "kwall %.3g N/m (margin %.2f)  m_eff %.1f kg  rho_shell %.3g\n",
+                gi_wall * 1e3, gi_open * 1e3, vm.k_dest, vm.kwall_,
+                vm.kwall_ / vm.k_dest, vm.m_eff, vm.rho_shell);
+    // the design premise: the shell CAN hold the shape (kwall > k_dest); if this fails
+    // the machine pin itself must be adjudicated (a D-entry, never a silent retune)
+    if (!(vm.kwall_ > vm.k_dest)) { std::puts("VERTICAL RED: shell cannot hold the shape"); return 1; }
     // the pre-registered CLASS: wall-set 10–100 ms with the shell; removing the shell
     // makes the mode ≥5× faster (the 20-turn VS still screens passively — reported)
     if (!(gi_wall > 0.010 && gi_wall < 0.100)) { std::puts("VERTICAL RED: wall gamma class"); return 1; }
     if (!(gi_open > 0 && gi_open < 0.008 && gi_wall / gi_open >= 5.0)) {
         std::puts("VERTICAL RED: shell-removal separation"); return 1; }
+
+    // (1b) equilibrium-following demonstration (REPORT-ONLY — the merge's point):
+    // gamma now derives from the shape. A softer elongation must soften the enemy;
+    // a lower Ip must soften it quadratically (linear GS, fixed boundary). The full
+    // l_i/profile movement arrives with transport; this shows the plumbing is live.
+    {
+        MachineCfg m2 = m; m2.kappa_sep = 1.60;
+        const VertDerived v2 = gs_vertical_derive(m2);
+        MachineCfg m3 = m; m3.Ip_MA = 6.0;
+        const VertDerived v3 = gs_vertical_derive(m3);
+        VerticalModel vk; vk.build(m2, v2.k_dest_Npm);
+        std::printf("equilibrium-following: kappa 1.85->1.60: n %.3f->%.3f  k_dest "
+                    "%.2e->%.2e (gamma^-1 %.1f->%.1f ms)  |  Ip 8.5->6.0 MA: k_dest "
+                    "%.2e (ratio %.2f vs Ip^2 %.2f)\n",
+                    vd.n_decay, v2.n_decay, vd.k_dest_Npm, v2.k_dest_Npm,
+                    gi_wall * 1e3, 1e3 / vk.gamma_wall, v3.k_dest_Npm,
+                    v3.k_dest_Npm / vd.k_dest_Npm, (6.0 * 6.0) / (8.5 * 8.5));
+    }
 
     SimInputs in;
     in.m = m;
@@ -30,6 +60,7 @@ int main(int argc, char** argv) {
     in.d = load_dispersions(root + "/contracts/dispersions.toml");
     in.k = load_gains(root + "/control/gains_m0.toml");
     in.ic = load_innov(root + "/contracts/events.toml");
+    in.vd = vd;                     // computed once above; run_sim would re-derive per run
 
     // ---- DEV sweep mode: test_vertical <root> sweep — maps the gain landscape,
     // truth-feedback vs EKF-feedback, to separate controller from estimator issues.

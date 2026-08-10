@@ -57,7 +57,13 @@ MachineCfg load_machine(const std::string& path) {
     m.init_n_e20 = num(t, "initial_state", "n_e20", 0.3);
     m.ip_ramp_max = num(t, "rates", "ip_ramp_max_MA_per_s", 1.0);
     m.n_ramp_max = num(t, "rates", "n_ramp_max_e20_per_s", 0.15);
+    m.b_over_a = num(t, "vessel", "b_over_a", 1.35);
+    m.tau_wall_s = num(t, "vessel", "tau_wall_ms", 25.0) * 1e-3;
+    m.kappa_shell = num(t, "vessel", "kappa_shell", 1.5);
+    if (auto v = t["vessel"]["n_passive_filaments"].value<int64_t>()) m.n_passive = int(*v);
     if (m.V <= 0 || m.nGW_e20 <= 0) throw std::runtime_error("machine.toml: bad config");
+    if (m.n_passive != 24)   // the tier-1 model's compile-time filament count (vertical.h)
+        throw std::runtime_error("machine.toml: n_passive_filaments != 24 (model pin)");
     return m;
 }
 

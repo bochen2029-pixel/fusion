@@ -47,6 +47,11 @@ struct RunResult {
 struct SimInputs {
     MachineCfg m; FloorsCfg f; GatesCfg g; DispersionsCfg d; ScenarioCfg s; GainsCfg k;
     InnovCfg ic;                    // events.toml [innovation] (M1 slice 1)
+    VertDerived vd;                 // equilibrium-derived vertical inputs (D-038).
+                                    // Callers that Monte-Carlo vert_on scenarios fill it
+                                    // ONCE (gs_vertical_derive); run_sim computes it on
+                                    // demand when unset (correct, ~0.5 s — fine for
+                                    // single runs, wasteful in loops).
 };
 
 RunResult run_sim(const SimInputs& in, uint64_t seed, bool record);

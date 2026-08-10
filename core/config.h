@@ -28,6 +28,20 @@ struct MachineCfg {
     double init_Ip_MA = 0.5, init_T_keV = 0.3, init_n_e20 = 0.3;
     // rates (machine capability)
     double ip_ramp_max = 1.0, n_ramp_max = 0.15;
+    // vessel (passive conductor — D-038 promoted these from vertical.h hard-codes)
+    double b_over_a = 1.35, tau_wall_s = 0.025, kappa_shell = 1.5;
+    int    n_passive = 24;
+};
+
+// The equilibrium→vertical bridge (the MERGE, D-038): what the vertical channel takes
+// from the shape — DERIVED by gs_vertical_derive(), never configured. Pure function of
+// the machine config at this slice; Monte-Carlo callers compute once, pass via SimInputs.
+struct VertDerived {
+    double k_dest_Npm = 0;      // rigid-displacement destabilizing force gradient [N/m]
+    double n_decay = 0;         // external-field decay index at the axis (<0 = unstable)
+    double Bz_ext_axis_T = 0;   // the maintaining (Shafranov) vertical field [T]
+    double R_axis_m = 0;
+    bool   set = false;
 };
 
 struct FloorsCfg {

@@ -65,7 +65,12 @@ n_min_e20          = 0.3    # low-density floor (runaway-prone / L-mode collapse
 # PHY-03/CTL-01: without this structure the axisymmetric vertical mode is ideal-MHD
 # (Alfvén-fast, uncontrollable). With it, gamma is set by the wall L/R time.
 b_over_a           = 1.35   # effective wall minor radius / plasma minor radius
+kappa_shell        = 1.5    # vessel shell elongation (D-038: promoted from an implicit
+                            # slice-1 code constant to a pinned machine value)
 tau_wall_ms        = 25.0   # vessel L/R time (thick double-shell, SPARC-flavored choice)
+                            # D-038: the tier-1 model calibrates its ONE resistive scalar
+                            # so the vertical-SCREENING eigenmode carries this tau; the
+                            # mode spectrum, k_wall and gamma are then derived, reported
 n_passive_filaments = 24    # axisymmetric filament circuits in the tier-1 model
                             # (full mutual-inductance matrix M_pp/M_pc/M_p-plasma; built
                             # GENERAL so it also carries quench eddy/halo forces later)

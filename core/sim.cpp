@@ -4,6 +4,7 @@
 #include "sim.h"
 #include "philox.h"
 #include "vertical.h"
+#include "gs.h"
 #include <cmath>
 #include <algorithm>
 
@@ -98,7 +99,9 @@ RunResult run_sim(const SimInputs& in, uint64_t seed, bool record) {
     uint64_t kick_tick = ~0ull;
     const InnovCfg icfg = in.ic;       // events.toml [innovation], loaded by the caller
     if (sc.vert_on) {
-        vmod.build(m);
+        // the MERGE (D-038): k_dest arrives from the shaped equilibrium, never a constant
+        const VertDerived vd = in.vd.set ? in.vd : gs_vertical_derive(m);
+        vmod.build(m, vd.k_dest_Npm);
         r.gamma_wall = vmod.gamma_wall; r.gamma_open = vmod.gamma_open;
         xvert[0] = in.d.z0_mm * 1e-3 * b1.g1;              // the drawn z0 jitter, at last
         vekf.init(vmod, 0.75e-3);                          // 4 probes averaged, 1.5 mm each

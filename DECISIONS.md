@@ -296,3 +296,24 @@ cross-session with the operator ratifying.*
   k_dest becomes DERIVED from this equilibrium's field (decay index), completing
   report-don't-configure end-to-end; then free-boundary/von Hagenow, X-point,
   model-EKF + χ² NIS, transport, oracle, F-SHAPE-1.
+- **D-038 · 2026-08-09 · M1 slice 3 — the MERGE: the enemy derives from the shape (M1 open).**
+  vertical.h's calibrated k_dest is REMOVED; the destabilizing gradient now derives
+  from the shaped equilibrium's external field (ψ_ext = ψ_total − ψ_self via Green-BC
+  full-rectangle solve; decay index n at the axis; k_dest = −2πR·Ip·∂Bz_ext/∂R).
+  MEASURED: n = −1.047, Bz_ext = −0.586 T, k_dest = 3.28e7 N/m — 19× the slice-1
+  calibration; ψ_ext discrete-harmonic to 5.5e-16. The shell had to become real to
+  hold it: the FULL 25×25 mutual-inductance matrix ships (machine.toml/spec already
+  demanded it; slice-1's diagonal approximation under-carried collective screening
+  ~43×) — kwall = c^T M⁻¹ c = 1.66e8 N/m, margin 5.05; ONE surface-resistivity
+  scalar calibrated so the screening eigenmode carries the PINNED τ_wall = 25 ms
+  (ρ_shell = 1.18e-5 Ω/sq reported); m_eff now computed to pin the screened artifact
+  at 180 Hz (103.8 kg, documented regularization). γ⁻¹ = 47.1 ms wall-set / 5.26 ms
+  shell-removed — class [10,100] held with the real physics. γ MOVES with the
+  equilibrium (κ 1.85→1.60 ⇒ γ⁻¹ 47→68 ms; k_dest ∝ Ip² exact) — the lethal-legal
+  lever exists. Contract changes: machine.toml [vessel] kappa_shell = 1.5 pinned
+  (promoted from an implicit code constant); SimInputs.vd carries the derived bridge;
+  new replay guard (precomputed vs on-demand derivation bit-identical). Null kept at
+  Kpz 5e4/Kdz 200 (20/20 through 60 mm, zmax 0.089, quiet NIS 0.6; Kp floor <3e4,
+  Kd cliff 500–1000 — D-035's lag lesson re-measured at real stiffness). Innovation
+  lane sharpened free: kicks tokenize 20/20 (was 11/20). Receipt
+  runs/m1s3-merge-2026-08-09.md + ledgers runs/m1s3/. ctest 7/7.
